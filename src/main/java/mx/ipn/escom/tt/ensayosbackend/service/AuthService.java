@@ -121,6 +121,9 @@ public class AuthService {
     }
 
     private void validarDominioRol(String correo, String rol) {
+        if (rol.equals("ADMINISTRADOR")) {
+            throw new IllegalArgumentException("Rol no válido");
+        }
         if (rol.equals("ALUMNO") && !correo.endsWith(ALUMNO_DOMAIN)) {
             throw new IllegalArgumentException(
                     "Los alumnos deben usar correo @alumno.ipn.mx");

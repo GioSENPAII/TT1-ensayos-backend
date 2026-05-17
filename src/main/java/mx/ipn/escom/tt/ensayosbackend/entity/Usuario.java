@@ -46,6 +46,6 @@ public class Usuario {
     @Builder.Default
     private LocalDateTime fechaRegistro = LocalDateTime.now();
 
-    public enum Rol { ALUMNO, PROFESOR }
+    public enum Rol { ALUMNO, PROFESOR, ADMINISTRADOR }
     public enum Estado { ACTIVO, SUSPENDIDO }
 }
