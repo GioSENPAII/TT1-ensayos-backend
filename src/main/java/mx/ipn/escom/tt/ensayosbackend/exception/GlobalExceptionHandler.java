@@ -5,7 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -55,6 +59,31 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleMethod(HttpRequestMethodNotSupportedException e,
                                                       HttpServletRequest request) {
         return build(HttpStatus.METHOD_NOT_ALLOWED, "Método no permitido para este recurso", request, null);
+    }
+
+    // Respaldo ante carreras: la restricción UNIQUE de la BD detectó un duplicado
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ProblemDetail> handleIntegrity(DataIntegrityViolationException e,
+                                                         HttpServletRequest request) {
+        log.warn("Violación de integridad en {}: {}", request.getRequestURI(), e.getMostSpecificCause().getMessage());
+        return build(HttpStatus.CONFLICT, "El registro ya existe o entra en conflicto con otro.", request, null);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ProblemDetail> handleTypeMismatch(MethodArgumentTypeMismatchException e,
+                                                            HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "Parámetro inválido: " + e.getName(), request, null);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ProblemDetail> handleMissingParam(MissingServletRequestParameterException e,
+                                                            HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "Falta el parámetro: " + e.getParameterName(), request, null);
+    }
+
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<ProblemDetail> handleDenied(AuthorizationDeniedException e, HttpServletRequest request) {
+        return build(HttpStatus.FORBIDDEN, "No tienes permiso para realizar esta acción.", request, null);
     }
 
     @ExceptionHandler(Exception.class)

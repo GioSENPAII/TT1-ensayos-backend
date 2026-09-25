@@ -168,6 +168,44 @@ Incluye en cada petición: `Authorization: Bearer <accessToken>`.
 
 ---
 
+## Grupos (CU-WEB-01, CU-WEB-04, CU-ALU-01)
+
+Las fechas usan el formato ISO local, sin zona horaria, por ejemplo `"2026-10-10T23:59:00"`. Todas están en hora del centro de México.
+
+### Profesor
+| Método | Endpoint | Cuerpo | Respuesta |
+|---|---|---|---|
+| POST | `/groups` | `{ "nombre": "SO 3CM1" }` | **201** grupo creado. El código de 6 caracteres lo genera el servidor. **409** si ya tienes un grupo con ese nombre |
+| GET | `/groups` | — | **200** `[grupo]` con tus grupos |
+| GET | `/groups/{id}` | — | **200** grupo. **403** si el grupo no es tuyo. **404** si no existe |
+| PATCH | `/groups/{id}/status` | `{ "estado": "INACTIVO" }` | **200** grupo. Un grupo `INACTIVO` no acepta nuevas inscripciones (RN-WEB-01) |
+| DELETE | `/groups/{id}` | — | **204**. Borra en cascada tareas, entregas y calificaciones |
+| GET | `/groups/{id}/students` | — | **200** `[{ id, nombre, apellidos, correo, fechaInscripcion }]` en orden alfabético |
+| DELETE | `/groups/{id}/students/{studentId}` | — | **204**. Saca al alumno del grupo y borra sus entregas en ese grupo |
+
+`grupo` = `{ id, nombre, codigoAcceso, estado: "ACTIVO"|"INACTIVO", fechaCreacion, totalAlumnos, totalTareas }`
+
+### Alumno
+| Método | Endpoint | Cuerpo | Respuesta |
+|---|---|---|---|
+| GET | `/students/me/groups` | — | **200** `[{ id, nombre, profesor, estado, fechaInscripcion }]` |
+| POST | `/groups/join` | `{ "codigo": "SO3CM1" }` | **201** el grupo. **404** si el código no es válido. **409** si el grupo está inactivo o ya eres parte de él |
+
+## Tareas (CU-WEB-05)
+
+| Método | Endpoint | Rol | Cuerpo / notas |
+|---|---|---|---|
+| POST | `/assignments` | Profesor | `{ groupId, nombre, fechaApertura, fechaCierre }` → **201**. **400** si el cierre no es posterior a la apertura. **409** si el nombre se repite en el grupo |
+| GET | `/assignments?groupId=1` | Profesor / Alumno | Profesor: todas las tareas del grupo, con `tieneEntregas`. Alumno inscrito: solo las que ya abrieron, con `entrega` y `pendiente`. **403** si el alumno no está inscrito |
+| PUT | `/assignments/{id}` | Profesor | Mismo cuerpo que POST, sin `groupId`. Si ya hay entregas, solo se puede **extender** `fechaCierre`; cualquier otro cambio responde **409** |
+| DELETE | `/assignments/{id}` | Profesor | **204**. Borra la tarea y sus entregas |
+
+`tarea` = `{ id, groupId, grupo, nombre, fechaApertura, fechaCierre, disponibilidad: "PROXIMA"|"ABIERTA"|"CERRADA", tieneEntregas?, entrega?: { id, estado, fechaEntrega }, pendiente? }`. Si no aparece `entrega` en la vista del alumno, significa "Sin entregar".
+
+El administrador recibe **403** en grupos y tareas (RN-WEB-03).
+
+---
+
 ## Cuentas de prueba (BD local, `seed_local.sql`)
 
 | Correo | Contraseña | Rol |
