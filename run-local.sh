@@ -12,6 +12,10 @@ if [ -f env.yaml ]; then
   export AI_API_KEY=$(grep '^AI_API_KEY:' env.yaml | cut -d: -f2- | xargs)
 fi
 
-# Motor de IA: simulado por defecto. Para usar el microservicio real: AI_MODE=real ./run-local.sh
+# Motor de IA: el microservicio real si hay llave en env.yaml. AI_MODE=simulado ./run-local.sh para no
+# enviarle archivos (el motor real guarda cada ensayo en su historial de plagio).
+if [ -n "$AI_API_KEY" ]; then
+  export AI_MODE=${AI_MODE:-real}
+fi
 
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
