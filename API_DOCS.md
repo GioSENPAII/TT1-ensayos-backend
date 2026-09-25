@@ -1,0 +1,179 @@
+# Documentación de la API — Ensayos ESCOM-IPN
+
+> **Cambios recientes (autenticación TT2):**
+> - `verify-token` ahora **requiere `correo`**.
+> - El `refreshToken` ya no es un JWT: es una cadena opaca de un solo uso. Cada renovación devuelve uno nuevo.
+> - Nuevos endpoints: `resend-token`, `refresh-token`, `logout`, `forgot-password`, `reset-password`, `admin/request-otp` y `admin/verify-otp`.
+> - Contraseñas: mínimo 8 caracteres, con al menos una mayúscula, una minúscula y un número.
+> - Los errores usan el formato RFC 9457 y siguen incluyendo el campo `error`.
+
+## Información general
+
+| Dato | Valor |
+|------|-------|
+| URL base (local) | `http://127.0.0.1:8080/api/v1` (emulador Android: `http://10.0.2.2:8080/api/v1`) |
+| Formato | JSON (`Content-Type: application/json`) |
+| Autenticación | `Authorization: Bearer <accessToken>` |
+
+La cuenta de Google Cloud expiró, así que por ahora el backend solo corre en local (ver la sección "Base de datos local" más abajo).
+
+### Formato de errores (RFC 9457)
+
+Todos los errores tienen esta forma. El campo `error` repite `detail`, para compatibilidad con los clientes que ya existían:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Código incorrecto. Te quedan 4 intentos.",
+  "instance": "/api/v1/auth/verify-token",
+  "error": "Código incorrecto. Te quedan 4 intentos."
+}
+```
+
+En los errores de validación se agrega `campos`, con el mensaje de cada campo inválido: `{"campos": {"password": "La contraseña debe tener..."}}`.
+
+| Código | Cuándo |
+|---|---|
+| 400 | Datos inválidos, código incorrecto o expirado |
+| 401 | Credenciales incorrectas, token ausente, inválido o expirado |
+| 403 | Cuenta suspendida o rol sin permiso |
+| 404 | Recurso inexistente |
+| 409 | El correo ya tiene cuenta |
+| 429 | Reenvío de código antes de 60 s |
+| 503 | Falla el servicio de correo |
+
+### Códigos de 6 dígitos
+
+Se usan para la verificación de registro (15 min), el OTP del administrador (10 min) y la recuperación de contraseña (15 min).
+- Son de **un solo uso**.
+- Admiten **máximo 5 intentos**; después quedan invalidados y hay que pedir otro.
+- Pedir un código nuevo invalida el anterior.
+
+---
+
+## Registro (CU-AUTH-01 / CU-AUTH-02)
+
+### POST `/auth/register` — paso 1: enviar código
+```json
+{ "nombre": "Juan", "apellidos": "Pérez López", "correo": "juan.perez@alumno.ipn.mx", "rol": "ALUMNO" }
+```
+- `rol` puede ser `ALUMNO` (correo `@alumno.ipn.mx`) o `PROFESOR` (correo `@ipn.mx`).
+- **200:** `{ "message": "Código de verificación enviado a juan.perez@alumno.ipn.mx" }`
+- **400:** el dominio no corresponde al rol. **409:** el correo ya está registrado.
+
+### POST `/auth/resend-token` — reenviar código (E3)
+```json
+{ "correo": "juan.perez@alumno.ipn.mx" }
+```
+- **200:** código reenviado.
+- **404:** no hay un registro pendiente.
+- **429:** esperar 60 s entre reenvíos.
+
+### POST `/auth/verify-token` — paso 2: verificar y crear cuenta
+```json
+{ "correo": "juan.perez@alumno.ipn.mx", "token": "482910", "password": "MiContrasena123" }
+```
+- **200:** respuesta de sesión (ver abajo).
+- **400:** código incorrecto o expirado, intentos agotados, o contraseña fuera de la política.
+
+---
+
+## Sesión
+
+### POST `/auth/login` (CU-AUTH-04)
+```json
+{ "correo": "juan.perez@alumno.ipn.mx", "password": "MiContrasena123" }
+```
+**200 — respuesta de sesión** (la misma en `verify-token`, `admin/verify-otp` y `refresh-token`):
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "refreshToken": "pPBqsl7Fcp5vwVR8Hqb3ZRdfpilIkoIbHlT15wpaIyU",
+  "nombre": "Juan",
+  "correo": "juan.perez@alumno.ipn.mx",
+  "rol": "ALUMNO"
+}
+```
+- **401:** `"Correo o contraseña incorrectos"`. El mensaje es genérico a propósito.
+- **403:** `"Tu cuenta ha sido suspendida. Contacta al administrador."`
+
+### POST `/auth/refresh-token` — renovar la sesión
+```json
+{ "refreshToken": "pPBqsl7F..." }
+```
+- **200:** respuesta de sesión con un **nuevo par** de tokens. El refresh anterior deja de servir.
+- **401:** el token es inválido o expiró. Si alguien presenta un refresh que **ya se había usado**, se cierran **todas** las sesiones del usuario (protección contra robo de tokens).
+- **403:** la cuenta fue suspendida.
+
+Úsalo cuando cualquier endpoint responda **401**: renueva la sesión y repite la petición original. Si la renovación también falla, manda al usuario al login.
+
+### POST `/auth/logout` (CU-AUTH-05)
+```json
+{ "refreshToken": "pPBqsl7F..." }
+```
+- **204** sin cuerpo.
+- Borra los tokens guardados en el cliente aunque la petición falle.
+- El access token sigue siendo válido hasta que expire (15 min como máximo).
+
+---
+
+## Recuperar contraseña (CU-AUTH-06)
+
+### POST `/auth/forgot-password`
+```json
+{ "correo": "juan.perez@alumno.ipn.mx" }
+```
+**200** siempre, con `"Si el correo está registrado, recibirás un código de recuperación."` Nunca revela si la cuenta existe.
+
+### POST `/auth/reset-password`
+```json
+{ "correo": "juan.perez@alumno.ipn.mx", "codigo": "731045", "password": "NuevaContra1" }
+```
+- **200:** contraseña actualizada. Además se cierran todas las sesiones abiertas.
+- **400:** código inválido o contraseña fuera de la política.
+
+---
+
+## Administrador por OTP (CU-AUTH-03)
+
+### POST `/auth/admin/request-otp`
+```json
+{ "correo": "admin.ensayos@ipn.mx" }
+```
+**200** siempre, con `"Si el correo corresponde al administrador, recibirás un código de acceso."`
+
+### POST `/auth/admin/verify-otp`
+```json
+{ "correo": "admin.ensayos@ipn.mx", "otp": "904213" }
+```
+- **200:** respuesta de sesión con `rol: "ADMINISTRADOR"`.
+- **400:** código inválido o expirado.
+
+El administrador **no puede** entrar por `/auth/login`, porque no tiene contraseña.
+
+---
+
+## Endpoints protegidos
+
+Incluye en cada petición: `Authorization: Bearer <accessToken>`.
+
+- **Access token:** JWT HS256 que dura 15 minutos. Claims: `sub` (correo), `rol` (`ROLE_ALUMNO`, `ROLE_PROFESOR` o `ROLE_ADMINISTRADOR`), `correo` y `nombre`.
+- **Refresh token:** dura 15 días. Es opaco y solo sirve para `/auth/refresh-token` y `/auth/logout`.
+- **Control por rol:**
+  - `/students/me/**` → solo Alumno.
+  - `/users/**` → solo Administrador.
+  - Sin token → **401**. Con un rol no permitido → **403**.
+
+---
+
+## Cuentas de prueba (BD local, `seed_local.sql`)
+
+| Correo | Contraseña | Rol |
+|---|---|---|
+| `alumno.prueba@alumno.ipn.mx` | `Prueba123` | ALUMNO |
+| `profesor.prueba@ipn.mx` | `Prueba123` | PROFESOR |
+| `admin.ensayos@ipn.mx` | — (OTP) | ADMINISTRADOR |
+
+Con `MAIL_ENABLED=false ./run-local.sh` no se envían correos: el código se escribe en el log del backend (`[MAIL DESACTIVADO] ... | código: 123456`).

@@ -1,0 +1,31 @@
+# MySQL local para desarrollo (sustituye a Cloud SQL).
+name: ensayos
+# Levantar:  docker compose up -d
+# Reiniciar desde cero (borra datos y vuelve a ejecutar db/ddl.sql + db/seed_local.sql):
+#   docker compose down -v && docker compose up -d
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: ensayos-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_local
+      MYSQL_DATABASE: ensayos_db
+      MYSQL_USER: app_user
+      MYSQL_PASSWORD: app_local
+      TZ: America/Mexico_City
+    command: --default-time-zone=-06:00 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - ensayos-mysql-data:/var/lib/mysql
+      # Se ejecutan en orden alfabético solo la primera vez (volumen vacío)
+      - ./db/ddl.sql:/docker-entrypoint-initdb.d/01_ddl.sql:ro
+      - ./db/seed_local.sql:/docker-entrypoint-initdb.d/02_seed_local.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot_local"]
+      interval: 5s
+      retries: 20
+
+volumes:
+  ensayos-mysql-data:

@@ -30,8 +30,9 @@ public class Usuario {
     @Column(nullable = false, unique = true, length = 100)
     private String correo;
 
-    @Column(nullable = false, length = 255)
-    private String contrasena;
+    // NULL solo para el administrador, que se autentica por OTP (RN-AUTH-05)
+    @Column(name = "password_hash", length = 255)
+    private String passwordHash;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -40,12 +41,12 @@ public class Usuario {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private Estado estado = Estado.ACTIVO;
+    private Estado estado = Estado.ACTIVA;
 
     @Column(name = "fecha_registro", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime fechaRegistro = LocalDateTime.now();
 
     public enum Rol { ALUMNO, PROFESOR, ADMINISTRADOR }
-    public enum Estado { ACTIVO, SUSPENDIDO }
+    public enum Estado { ACTIVA, SUSPENDIDA }
 }

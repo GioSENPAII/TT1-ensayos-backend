@@ -17,26 +17,16 @@ public class JwtService {
 
     private final SecretKey key;
     private final long accessExpiration;
-    private final long refreshExpiration;
 
     public JwtService(
             @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.access-token-expiration}") long accessExpiration,
-            @Value("${app.jwt.refresh-token-expiration}") long refreshExpiration) {
+            @Value("${app.jwt.access-token-expiration}") long accessExpiration) {
         this.key = Keys.hmacShaKeyFor(Base64.getDecoder().decode(secret));
         this.accessExpiration = accessExpiration;
-        this.refreshExpiration = refreshExpiration;
     }
 
+    // El refresh token es opaco y se gestiona en TokenService (sección 4.4.4)
     public String generateAccessToken(Usuario usuario) {
-        return buildToken(usuario, accessExpiration);
-    }
-
-    public String generateRefreshToken(Usuario usuario) {
-        return buildToken(usuario, refreshExpiration);
-    }
-
-    private String buildToken(Usuario usuario, long expiration) {
         return Jwts.builder()
                 .subject(usuario.getCorreo())
                 .claims(Map.of(
@@ -45,8 +35,8 @@ public class JwtService {
                         "nombre", usuario.getNombre()
                 ))
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(key)
+                .expiration(new Date(System.currentTimeMillis() + accessExpiration))
+                .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
 

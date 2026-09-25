@@ -1,6 +1,8 @@
 package mx.ipn.escom.tt.ensayosbackend.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,12 +27,18 @@ public class Token {
     @JoinColumn(name = "id_usuario")
     private Usuario usuario;
 
-    @Column(nullable = false, length = 10)
+    // Código de 6 dígitos o hash SHA-256 del refresh token (RNF-04)
+    @Column(nullable = false, length = 255)
     private String token;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Tipo tipo;
+
+    @JdbcTypeCode(SqlTypes.TINYINT)
+    @Column(nullable = false)
+    @Builder.Default
+    private int intentos = 0;
 
     @Column(nullable = false)
     @Builder.Default
@@ -56,5 +64,5 @@ public class Token {
     @Column(name = "apellidos_pendiente", length = 100)
     private String apellidosPendiente;
 
-    public enum Tipo { REGISTRO, RESET_PASSWORD }
+    public enum Tipo { VERIFICACION, OTP, REFRESH, RECUPERACION }
 }
