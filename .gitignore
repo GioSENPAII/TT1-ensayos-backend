@@ -35,3 +35,6 @@ build/
 ### Secrets & local config ###
 env.yaml
 .DS_Store
+
+### PDFs subidos en local ###
+data/

@@ -73,6 +73,12 @@
 		</dependency>
 
 		<!-- JJWT 0.12.6 -->
+		<!-- Extracción de texto del PDF (CU-ALU-02 postcondición, RN-IA-01) -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.5</version>
+		</dependency>
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>

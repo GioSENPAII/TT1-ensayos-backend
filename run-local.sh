@@ -8,6 +8,10 @@ cd "$(dirname "$0")"
 if [ -f env.yaml ]; then
   export MAIL_USERNAME=$(grep '^MAIL_USERNAME:' env.yaml | cut -d: -f2- | xargs)
   export MAIL_PASSWORD=$(grep '^MAIL_PASSWORD:' env.yaml | cut -d: -f2- | xargs)
+  export AI_BASE_URL=$(grep '^AI_BASE_URL:' env.yaml | cut -d: -f2- | xargs)
+  export AI_API_KEY=$(grep '^AI_API_KEY:' env.yaml | cut -d: -f2- | xargs)
 fi
+
+# Motor de IA: simulado por defecto. Para usar el microservicio real: AI_MODE=real ./run-local.sh
 
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local

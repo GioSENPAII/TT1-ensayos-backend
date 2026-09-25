@@ -206,6 +206,46 @@ El administrador recibe **403** en grupos y tareas (RN-WEB-03).
 
 ---
 
+## Entregas y calificaciones (CU-ALU-02/03/04, CU-WEB-02)
+
+| Método | Endpoint | Rol | Notas |
+|---|---|---|---|
+| POST | `/submissions` | Alumno | `multipart/form-data` con `file` (PDF de 10 MB como máximo) y `assignmentId`. **201**: la entrega **ya calificada** (el proceso todavía es síncrono; ver C6) |
+| GET | `/submissions/{id}` | Alumno dueño / Profesor del grupo | La entrega y su `reporte` |
+| GET | `/submissions/{id}/grading` | Alumno dueño / Profesor del grupo | Solo el `reporte`. **404** si todavía no está calificada |
+| PATCH | `/submissions/{id}/grading` | Profesor | `{ "criterio": "Introducción", "puntaje": 0.5 }`. Valida que el puntaje esté entre 0 y el máximo, recalcula la calificación final y guarda la auditoría |
+| GET | `/submissions?assignmentId=1` | Profesor | Entregas de una tarea, cada una con los datos del `alumno` |
+| GET | `/students/me/submissions` | Alumno | Historial, de la entrega más reciente a la más antigua |
+
+**Errores al subir un ensayo:**
+
+| Código | Causa |
+|---|---|
+| 415 | El archivo no es PDF (se revisa la extensión **y** el contenido) |
+| 413 | El archivo pesa más de 10 MB |
+| 422 | El PDF no tiene texto seleccionable (es un escaneo), está dañado o tiene contraseña (RN-IA-01) |
+| 409 | La tarea no está abierta, ya cerró (RN-WEB-02), el ensayo ya fue calificado (RN-WEB-04) o se está calificando |
+| 403 | El alumno no está inscrito en el grupo de la tarea |
+
+**Estados de una entrega:** `EN_REVISION`, `CALIFICADO`, `POSIBLE_PLAGIO` o `ERROR`.
+- Con `ERROR` (el motor de IA falló), el alumno **puede volver a enviar** su ensayo. La respuesta trae un campo `mensaje` que explica qué pasó.
+- `POSIBLE_PLAGIO` **conserva la calificación** que dio el motor (RN-IA-03).
+
+`reporte` = `{ calificacionFinal, calificacionMaxima, observacion, fechaEvaluacion, modificadoPorDocente, fechaModificacion?, posiblePlagio, banderas: { requiereRevisionDocente, faltaContextoIntro, abusoVinetas }, criterios: [{ criterio, puntajeObtenido, puntajeMaximo, detalles, modificadoPorDocente, puntajeIa? }] }`.
+- Solo el profesor recibe además `similitudMaxima` y `coincidencias`.
+- `puntajeIa` es el valor original del motor. Aparece solo en los criterios que el docente ajustó.
+
+### Motor de IA
+
+El backend reenvía el PDF, **con su nombre original**, al microservicio `POST /v1/grade`. Su respuesta se guarda completa en `calificaciones.reporte_json`.
+
+- `AI_MODE=simulado` (**por defecto**): es un motor local que devuelve el mismo formato, sin enviar archivos a la nube.
+  - Si el nombre del archivo contiene `plagio`, simula una alerta de plagio.
+  - Si contiene `error`, simula una falla del motor.
+- `AI_MODE=real ./run-local.sh`: usa el microservicio real en Cloud Run. Necesita `AI_BASE_URL` y `AI_API_KEY` en `env.yaml`.
+
+---
+
 ## Cuentas de prueba (BD local, `seed_local.sql`)
 
 | Correo | Contraseña | Rol |

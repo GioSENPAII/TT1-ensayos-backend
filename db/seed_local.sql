@@ -32,3 +32,9 @@ FROM grupos WHERE codigo_acceso = 'SO3CM1';
 INSERT INTO tareas (id_grupo, nombre, fecha_apertura, fecha_cierre)
 SELECT id_grupo, 'Ensayo Diagnóstico', NOW() - INTERVAL 20 DAY, NOW() - INTERVAL 5 DAY
 FROM grupos WHERE codigo_acceso = 'SO3CM1';
+
+-- El alumno de prueba ya está inscrito en SO3CM1 (las pruebas de integración de la app lo requieren)
+INSERT INTO inscripciones (id_alumno, id_grupo)
+SELECT u.id_usuario, g.id_grupo
+FROM usuarios u JOIN grupos g ON g.codigo_acceso = 'SO3CM1'
+WHERE u.correo = 'alumno.prueba@alumno.ipn.mx';

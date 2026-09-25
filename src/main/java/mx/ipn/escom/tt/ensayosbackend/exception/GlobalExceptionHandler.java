@@ -10,6 +10,9 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -79,6 +82,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleMissingParam(MissingServletRequestParameterException e,
                                                             HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, "Falta el parámetro: " + e.getParameterName(), request, null);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ProblemDetail> handleTooLarge(MaxUploadSizeExceededException e, HttpServletRequest request) {
+        return build(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo supera el límite de 10 MB", request, null);
+    }
+
+    @ExceptionHandler({MissingServletRequestPartException.class, MultipartException.class})
+    public ResponseEntity<ProblemDetail> handleMultipart(Exception e, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "Adjunta el archivo PDF en el campo \"file\"", request, null);
     }
 
     @ExceptionHandler(AuthorizationDeniedException.class)
