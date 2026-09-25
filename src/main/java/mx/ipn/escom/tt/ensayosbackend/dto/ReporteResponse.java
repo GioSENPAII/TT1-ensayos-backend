@@ -49,7 +49,12 @@ public class ReporteResponse {
         private String criterio;
         private BigDecimal puntajeObtenido;
         private BigDecimal puntajeMaximo;
+        /** ALTO (100 %), MEDIO (parcial) o BAJO (0 %). */
+        private String nivel;
+        /** Descripción de la Tabla 14 que corresponde al nivel obtenido. */
         private String detalles;
+        /** Detalle técnico devuelto por el motor de IA. */
+        private String detallesMotor;
         private boolean modificadoPorDocente;
         /** Puntaje original de la IA cuando el docente lo ajustó. */
         private BigDecimal puntajeIa;

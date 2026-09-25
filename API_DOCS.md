@@ -231,7 +231,10 @@ El administrador recibe **403** en grupos y tareas (RN-WEB-03).
 - Con `ERROR` (el motor de IA falló), el alumno **puede volver a enviar** su ensayo. La respuesta trae un campo `mensaje` que explica qué pasó.
 - `POSIBLE_PLAGIO` **conserva la calificación** que dio el motor (RN-IA-03).
 
-`reporte` = `{ calificacionFinal, calificacionMaxima, observacion, fechaEvaluacion, modificadoPorDocente, fechaModificacion?, posiblePlagio, banderas: { requiereRevisionDocente, faltaContextoIntro, abusoVinetas }, criterios: [{ criterio, puntajeObtenido, puntajeMaximo, detalles, modificadoPorDocente, puntajeIa? }] }`.
+`reporte` = `{ calificacionFinal, calificacionMaxima, observacion, fechaEvaluacion, modificadoPorDocente, fechaModificacion?, posiblePlagio, banderas: { requiereRevisionDocente, faltaContextoIntro, abusoVinetas }, criterios: [{ criterio, puntajeObtenido, puntajeMaximo, nivel, detalles, detallesMotor, modificadoPorDocente, puntajeIa? }] }`.
+- `nivel` puede ser `ALTO` (100 %), `MEDIO` (parcial) o `BAJO` (0 %).
+- `detalles` es la **descripción de la Tabla 14** (rúbrica institucional) que corresponde a ese nivel. Muéstrala tal cual en la web, como hace la app (RNF-14).
+- `detallesMotor` es el texto técnico que devolvió el motor de IA (por ejemplo "Evaluado por CU-IA-09").
 - Solo el profesor recibe además `similitudMaxima` y `coincidencias`.
 - `puntajeIa` es el valor original del motor. Aparece solo en los criterios que el docente ajustó.
 

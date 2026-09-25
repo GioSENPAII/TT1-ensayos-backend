@@ -339,12 +339,19 @@ public class EntregaService {
         BigDecimal maxima = BigDecimal.ZERO;
         for (JsonNode c : reporte.path("desglose_rubrica")) {
             BigDecimal max = c.path("puntaje_maximo").decimalValue();
+            BigDecimal obtenido = c.path("puntaje_obtenido").decimalValue();
             maxima = maxima.add(max);
+            String nombre = c.path("criterio").asText();
+            String detalleMotor = c.path("detalles").asText(null);
+            RubricaInstitucional.Nivel nivel = RubricaInstitucional.nivel(obtenido, max);
+            String descripcion = RubricaInstitucional.descripcion(nombre, nivel);
             criterios.add(ReporteResponse.Criterio.builder()
-                    .criterio(c.path("criterio").asText())
-                    .puntajeObtenido(c.path("puntaje_obtenido").decimalValue())
+                    .criterio(nombre)
+                    .puntajeObtenido(obtenido)
                     .puntajeMaximo(max)
-                    .detalles(c.path("detalles").asText(null))
+                    .nivel(nivel.name())
+                    .detalles(descripcion != null ? descripcion : detalleMotor)
+                    .detallesMotor(detalleMotor)
                     .modificadoPorDocente(c.path("modificado_por_docente").asBoolean(false))
                     .puntajeIa(c.has("puntaje_ia") ? c.path("puntaje_ia").decimalValue() : null)
                     .build());
