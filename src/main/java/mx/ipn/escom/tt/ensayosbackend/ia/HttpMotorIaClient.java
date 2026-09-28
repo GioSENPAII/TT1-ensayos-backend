@@ -61,6 +61,7 @@ public class HttpMotorIaClient implements MotorIaClient {
         form.add("submission_id", String.valueOf(idEnsayo));
         form.add("task_id", String.valueOf(idTarea));
 
+        long inicio = System.nanoTime();
         try {
             JsonNode body = restClient.post()
                     .uri("/v1/grade")
@@ -71,7 +72,12 @@ public class HttpMotorIaClient implements MotorIaClient {
             if (body == null || !body.path("result").isObject()) {
                 throw new MotorIaException("Respuesta del motor de IA sin 'result'");
             }
-            return (ObjectNode) body.get("result");
+            ObjectNode result = (ObjectNode) body.get("result");
+            log.info("IA real: entrega {} calificada en {} s → {} (plagio: {})", idEnsayo,
+                    String.format("%.1f", (System.nanoTime() - inicio) / 1e9),
+                    result.path("metadata").path("calificacion_final").asText("?"),
+                    result.path("plagio").path("detectado").asBoolean(false));
+            return result;
         } catch (RestClientResponseException e) {
             String detalle = mensajeDeError(e.getResponseBodyAsString());
             log.warn("Motor de IA respondió {}: {}", e.getStatusCode(), detalle);

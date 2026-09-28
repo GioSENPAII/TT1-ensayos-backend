@@ -99,6 +99,7 @@ public class MotorIaSimulado implements MotorIaClient {
             coincidencias.addObject().put("document_hash", HexFormat.of().formatHex(hash)).put("similarity", 0.953);
         }
         result.set("desglose_rubrica", desglose);
+        log.info("IA SIMULADA: entrega {} calificada → {}", idEnsayo, finalRedondeada);
         return result;
     }
 
