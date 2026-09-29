@@ -96,7 +96,7 @@ public class MotorIaSimulado implements MotorIaClient {
         ObjectNode plagioNode = result.putObject("plagio").put("detectado", plagio);
         ArrayNode coincidencias = plagioNode.putArray("coincidencias");
         if (plagio) {
-            coincidencias.addObject().put("document_hash", HexFormat.of().formatHex(hash)).put("similarity", 0.953);
+            coincidencias.addObject().put("document_hash", HexFormat.of().formatHex(hash)).put("similarity", 0.985);
         }
         result.set("desglose_rubrica", desglose);
         log.info("IA SIMULADA: entrega {} calificada → {}", idEnsayo, finalRedondeada);

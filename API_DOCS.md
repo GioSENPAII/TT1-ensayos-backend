@@ -230,6 +230,9 @@ El administrador recibe **403** en grupos y tareas (RN-WEB-03).
 **Estados de una entrega:** `EN_REVISION`, `CALIFICADO`, `POSIBLE_PLAGIO` o `ERROR`.
 - Con `ERROR` (el motor de IA falló), el alumno **puede volver a enviar** su ensayo. La respuesta trae un campo `mensaje` que explica qué pasó.
 - `POSIBLE_PLAGIO` **conserva la calificación** que dio el motor (RN-IA-03).
+- **Regla de plagio del backend:** hay alerta solo si la **primera coincidencia** que devuelve el motor tiene una similitud **mayor a 0.96**. Se configura con `app.ia.umbral-plagio`. La bandera `detectado` del motor, que usa 0.92, no se toma en cuenta.
+  - Cuando no se supera el umbral, `posiblePlagio` es `false`.
+  - Además se omite la observación del motor sobre similitud histórica y `requiereRevisionDocente` queda en `false` si el motor solo lo pedía por plagio.
 
 `reporte` = `{ calificacionFinal, calificacionMaxima, observacion, fechaEvaluacion, modificadoPorDocente, fechaModificacion?, posiblePlagio, banderas: { requiereRevisionDocente, faltaContextoIntro, abusoVinetas }, criterios: [{ criterio, puntajeObtenido, puntajeMaximo, nivel, detalles, detallesMotor, modificadoPorDocente, puntajeIa? }] }`.
 - `nivel` puede ser `ALTO` (100 %), `MEDIO` (parcial) o `BAJO` (0 %).

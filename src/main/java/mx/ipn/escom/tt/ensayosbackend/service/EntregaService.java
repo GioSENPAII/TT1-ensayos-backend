@@ -13,6 +13,7 @@ import mx.ipn.escom.tt.ensayosbackend.entity.*;
 import mx.ipn.escom.tt.ensayosbackend.exception.ApiException;
 import mx.ipn.escom.tt.ensayosbackend.ia.MotorIaClient;
 import mx.ipn.escom.tt.ensayosbackend.repository.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +54,10 @@ public class EntregaService {
     private final MotorIaClient motorIa;
     private final TransactionTemplate tx;
     private final ObjectMapper objectMapper;
+
+    /** La alerta de plagio se activa si la primera coincidencia del motor supera este valor. */
+    @Value("${app.ia.umbral-plagio:0.96}")
+    private BigDecimal umbralPlagio;
 
     // ---------------------------------------------------------------- Enviar ensayo (CU-ALU-02)
 
@@ -147,7 +152,7 @@ public class EntregaService {
             throw new IllegalArgumentException("Respuesta del motor de IA incompleta");
         }
 
-        boolean plagio = resultado.path("plagio").path("detectado").asBoolean(false);
+        boolean plagio = esPlagio(resultado);
         BigDecimal similitud = null;
         for (JsonNode c : resultado.path("plagio").path("coincidencias")) {
             BigDecimal s = c.path("similarity").decimalValue();
@@ -334,6 +339,7 @@ public class EntregaService {
     private ReporteResponse aReporte(Calificacion calificacion, boolean vistaProfesor) {
         ObjectNode reporte = leerReporte(calificacion);
         JsonNode banderas = reporte.path("banderas_retroalimentacion");
+        boolean plagio = esPlagio(reporte);
 
         List<ReporteResponse.Criterio> criterios = new ArrayList<>();
         BigDecimal maxima = BigDecimal.ZERO;
@@ -360,13 +366,13 @@ public class EntregaService {
         ReporteResponse.ReporteResponseBuilder b = ReporteResponse.builder()
                 .calificacionFinal(calificacion.getCalificacionFinal().setScale(1, RoundingMode.HALF_UP))
                 .calificacionMaxima(maxima.setScale(1, RoundingMode.HALF_UP))
-                .observacion(reporte.path("metadata").path("observacion").asText(null))
+                .observacion(observacion(reporte, plagio))
                 .fechaEvaluacion(calificacion.getFechaEvaluacion())
                 .modificadoPorDocente(calificacion.isModificadoPorDocente())
                 .fechaModificacion(calificacion.getFechaModificacion())
-                .posiblePlagio(reporte.path("plagio").path("detectado").asBoolean(false))
+                .posiblePlagio(plagio)
                 .banderas(ReporteResponse.Banderas.builder()
-                        .requiereRevisionDocente(banderas.path("requiere_revision_docente").asBoolean(false))
+                        .requiereRevisionDocente(requiereRevision(reporte, plagio))
                         .faltaContextoIntro(banderas.path("falta_contexto_intro").asBoolean(false))
                         .abusoVinetas(banderas.path("abuso_vinetas").asBoolean(false))
                         .build())
@@ -381,6 +387,38 @@ public class EntregaService {
             b.similitudMaxima(calificacion.getSimilitudPlagio()).coincidencias(coincidencias);
         }
         return b.build();
+    }
+
+    /**
+     * Alerta de plagio: la similitud de la primera coincidencia devuelta por el motor debe ser mayor
+     * al umbral (0.96). La bandera "detectado" del motor, que usa 0.92, no se toma en cuenta.
+     */
+    private boolean esPlagio(JsonNode reporte) {
+        JsonNode coincidencias = reporte.path("plagio").path("coincidencias");
+        if (!coincidencias.isArray() || coincidencias.isEmpty()) {
+            return false;
+        }
+        return coincidencias.get(0).path("similarity").decimalValue().compareTo(umbralPlagio) > 0;
+    }
+
+    private static boolean motorMarcoPlagio(JsonNode reporte) {
+        return reporte.path("plagio").path("detectado").asBoolean(false)
+                || reporte.path("banderas_retroalimentacion").path("plagio_detectado").asBoolean(false);
+    }
+
+    /** Si el motor avisó plagio pero no supera el umbral, su observación sobre similitud ya no aplica. */
+    private static String observacion(JsonNode reporte, boolean plagio) {
+        String texto = reporte.path("metadata").path("observacion").asText(null);
+        if (!plagio && motorMarcoPlagio(reporte)) {
+            return null;
+        }
+        return texto;
+    }
+
+    /** La revisión docente que pidió el motor por plagio se descarta si no supera el umbral. */
+    private static boolean requiereRevision(JsonNode reporte, boolean plagio) {
+        boolean pedida = reporte.path("banderas_retroalimentacion").path("requiere_revision_docente").asBoolean(false);
+        return plagio || (pedida && !motorMarcoPlagio(reporte));
     }
 
     private ObjectNode leerReporte(Calificacion calificacion) {
