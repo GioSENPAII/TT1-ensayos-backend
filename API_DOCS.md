@@ -255,6 +255,24 @@ El backend reenvía el PDF, **con su nombre original**, al microservicio `POST /
 
 ---
 
+## Administrador (CU-WEB-03, RF-ADM-01 a 03)
+
+Todos requieren el token de una sesión de **administrador** (obtenida con `admin/verify-otp`). Cualquier otro rol recibe **403**. El administrador **nunca** ve ensayos ni calificaciones (RN-WEB-03), solo conteos.
+
+| Método | Endpoint | Notas |
+|---|---|---|
+| GET | `/admin/metrics` | `{ alumnos, profesores, cuentasActivas, cuentasSuspendidas, gruposActivos, ensayosProcesados, ensayosEnRevision }` |
+| GET | `/users?rol=&estado=&q=&page=0&size=20` | Directorio **paginado** de alumnos y profesores. `rol` puede ser `ALUMNO` o `PROFESOR`; `estado`, `ACTIVA` o `SUSPENDIDA`; `q` busca en el correo o el nombre. Devuelve `{ contenido: [cuenta], pagina, tamano, totalElementos, totalPaginas }` |
+| GET | `/users/{id}` | La cuenta y su `impacto`, para el diálogo de confirmación antes de eliminar: `{ inscripciones?, grupos?, tareas?, entregas, advertencia }`. `advertencia` trae el texto de CU-WEB-03 4c/4d con los números reales |
+| PATCH | `/users/{id}/status` | `{ "estado": "SUSPENDIDA" }` o `{ "estado": "ACTIVA" }`. Al suspender, **se cierran las sesiones abiertas** de esa cuenta |
+| DELETE | `/users/{id}` | **204**. Elimina en cascada y en una sola transacción. Profesor: sus grupos, tareas, entregas y calificaciones; los alumnos conservan sus cuentas. Alumno: sus inscripciones, entregas y calificaciones. Los PDF se borran del disco |
+
+`cuenta` = `{ id, correo, nombre, apellidos, rol, estado, fechaRegistro }`
+
+La cuenta del administrador **no se puede consultar, suspender ni eliminar** desde estos endpoints (**403**, CU-WEB-03 E1).
+
+---
+
 ## Cuentas de prueba (BD local, `seed_local.sql`)
 
 | Correo | Contraseña | Rol |

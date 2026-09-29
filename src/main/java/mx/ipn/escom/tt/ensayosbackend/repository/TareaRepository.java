@@ -15,6 +15,8 @@ public interface TareaRepository extends JpaRepository<Tarea, Long> {
 
     long countByGrupo(Grupo grupo);
 
+    long countByGrupoProfesor(mx.ipn.escom.tt.ensayosbackend.entity.Usuario profesor);
+
     boolean existsByGrupoAndNombreIgnoreCase(Grupo grupo, String nombre);
 
     boolean existsByGrupoAndNombreIgnoreCaseAndIdTareaNot(Grupo grupo, String nombre, Long idTarea);

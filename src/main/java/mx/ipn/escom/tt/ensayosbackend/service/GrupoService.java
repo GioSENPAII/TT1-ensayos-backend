@@ -31,6 +31,7 @@ public class GrupoService {
     private final TareaRepository tareaRepository;
     private final EnsayoRepository ensayoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final AlmacenamientoService almacenamiento;
 
     // ---------------------------------------------------------------- Profesor (CU-WEB-01, CU-WEB-04)
 
@@ -63,7 +64,9 @@ public class GrupoService {
     /** Elimina el grupo; tareas, inscripciones, entregas y calificaciones caen por cascada (CU-WEB-01 B4). */
     @Transactional
     public void eliminar(Usuario profesor, Long idGrupo) {
-        grupoRepository.delete(grupoDelProfesor(profesor, idGrupo));
+        Grupo grupo = grupoDelProfesor(profesor, idGrupo);
+        almacenamiento.eliminarAlConfirmar(ensayoRepository.rutasDeGrupo(grupo));
+        grupoRepository.delete(grupo);
     }
 
     /** RN-WEB-01: desactivar el código impide nuevas inscripciones sin afectar las existentes. */
@@ -96,6 +99,7 @@ public class GrupoService {
                 .orElseThrow(() -> ApiException.notFound("El alumno no pertenece a este grupo"));
         Inscripcion inscripcion = inscripcionRepository.findByAlumnoAndGrupo(alumno, grupo)
                 .orElseThrow(() -> ApiException.notFound("El alumno no pertenece a este grupo"));
+        almacenamiento.eliminarAlConfirmar(ensayoRepository.rutasDeAlumnoEnGrupo(alumno, grupo));
         ensayoRepository.deleteByAlumnoAndGrupo(alumno, grupo);
         inscripcionRepository.delete(inscripcion);
     }

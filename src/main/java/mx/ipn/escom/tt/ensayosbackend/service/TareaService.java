@@ -32,6 +32,7 @@ public class TareaService {
     private final InscripcionRepository inscripcionRepository;
     private final EnsayoRepository ensayoRepository;
     private final GrupoService grupoService;
+    private final AlmacenamientoService almacenamiento;
 
     @Transactional
     public TareaResponse crear(Usuario profesor, TareaRequest request) {
@@ -116,7 +117,9 @@ public class TareaService {
     /** CU-WEB-05 B4: las entregas y calificaciones de la tarea caen por cascada. */
     @Transactional
     public void eliminar(Usuario profesor, Long idTarea) {
-        tareaRepository.delete(tareaDelProfesor(profesor, idTarea));
+        Tarea tarea = tareaDelProfesor(profesor, idTarea);
+        almacenamiento.eliminarAlConfirmar(ensayoRepository.rutasDeTarea(tarea));
+        tareaRepository.delete(tarea);
     }
 
     // ---------------------------------------------------------------- Auxiliares

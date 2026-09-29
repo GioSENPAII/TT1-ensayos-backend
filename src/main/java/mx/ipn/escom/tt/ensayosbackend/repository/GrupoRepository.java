@@ -12,4 +12,8 @@ public interface GrupoRepository extends JpaRepository<Grupo, Long> {
     Optional<Grupo> findByCodigoAcceso(String codigoAcceso);
     boolean existsByCodigoAcceso(String codigoAcceso);
     boolean existsByProfesorAndNombreIgnoreCase(Usuario profesor, String nombre);
+
+    long countByEstado(Grupo.Estado estado);
+
+    long countByProfesor(Usuario profesor);
 }

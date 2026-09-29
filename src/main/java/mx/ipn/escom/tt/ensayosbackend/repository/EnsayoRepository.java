@@ -21,6 +21,29 @@ public interface EnsayoRepository extends JpaRepository<Ensayo, Long> {
 
     List<Ensayo> findByEstado(Ensayo.Estado estado);
 
+    long countByEstadoIn(Collection<Ensayo.Estado> estados);
+
+    long countByAlumno(Usuario alumno);
+
+    // Rutas de los PDF que desaparecerán en una eliminación en cascada
+    @Query("SELECT e.rutaArchivo FROM Ensayo e WHERE e.alumno = :alumno")
+    List<String> rutasDeAlumno(@Param("alumno") Usuario alumno);
+
+    @Query("SELECT e.rutaArchivo FROM Ensayo e WHERE e.alumno = :alumno AND e.tarea.grupo = :grupo")
+    List<String> rutasDeAlumnoEnGrupo(@Param("alumno") Usuario alumno, @Param("grupo") Grupo grupo);
+
+    @Query("SELECT e.rutaArchivo FROM Ensayo e WHERE e.tarea = :tarea")
+    List<String> rutasDeTarea(@Param("tarea") Tarea tarea);
+
+    @Query("SELECT e.rutaArchivo FROM Ensayo e WHERE e.tarea.grupo = :grupo")
+    List<String> rutasDeGrupo(@Param("grupo") Grupo grupo);
+
+    @Query("SELECT e.rutaArchivo FROM Ensayo e WHERE e.tarea.grupo.profesor = :profesor")
+    List<String> rutasDeProfesor(@Param("profesor") Usuario profesor);
+
+    @Query("SELECT COUNT(e) FROM Ensayo e WHERE e.tarea.grupo.profesor = :profesor")
+    long countDeProfesor(@Param("profesor") Usuario profesor);
+
     java.util.Optional<Ensayo> findByAlumnoAndTarea(Usuario alumno, Tarea tarea);
 
     // Historial del alumno (CU-ALU-04), de la más reciente a la más antigua

@@ -26,4 +26,6 @@ public interface InscripcionRepository extends JpaRepository<Inscripcion, Long> 
     boolean existsByAlumnoAndGrupo(Usuario alumno, Grupo grupo);
 
     long countByGrupo(Grupo grupo);
+
+    long countByAlumno(Usuario alumno);
 }

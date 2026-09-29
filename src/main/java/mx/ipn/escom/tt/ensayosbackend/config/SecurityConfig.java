@@ -49,7 +49,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 // RNF-05: control de acceso por rol a nivel de URL
                 .requestMatchers("/api/v1/students/me/**").hasRole("ALUMNO")
-                .requestMatchers("/api/v1/users/**").hasRole("ADMINISTRADOR")
+                .requestMatchers("/api/v1/users/**", "/api/v1/admin/**").hasRole("ADMINISTRADOR")
                 .anyRequest().authenticated()
             )
             .exceptionHandling(e -> e
