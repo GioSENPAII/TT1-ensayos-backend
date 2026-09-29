@@ -210,7 +210,7 @@ El administrador recibe **403** en grupos y tareas (RN-WEB-03).
 
 | Método | Endpoint | Rol | Notas |
 |---|---|---|---|
-| POST | `/submissions` | Alumno | `multipart/form-data` con `file` (PDF de 10 MB como máximo) y `assignmentId`. **201**: la entrega **ya calificada** (el proceso todavía es síncrono; ver C6) |
+| POST | `/submissions` | Alumno | `multipart/form-data` con `file` (PDF de 10 MB como máximo) y `assignmentId`. Responde **202 Accepted** en menos de 1 s, con la entrega en `EN_REVISION` y el encabezado `Location`. **La calificación se hace en segundo plano**: consulta `GET /submissions/{id}` cada 2 o 3 s hasta que el estado cambie |
 | GET | `/submissions/{id}` | Alumno dueño / Profesor del grupo | La entrega y su `reporte` |
 | GET | `/submissions/{id}/grading` | Alumno dueño / Profesor del grupo | Solo el `reporte`. **404** si todavía no está calificada |
 | PATCH | `/submissions/{id}/grading` | Profesor | `{ "criterio": "Introducción", "puntaje": 0.5 }`. Valida que el puntaje esté entre 0 y el máximo, recalcula la calificación final y guarda la auditoría |
@@ -227,7 +227,10 @@ El administrador recibe **403** en grupos y tareas (RN-WEB-03).
 | 409 | La tarea no está abierta, ya cerró (RN-WEB-02), el ensayo ya fue calificado (RN-WEB-04) o se está calificando |
 | 403 | El alumno no está inscrito en el grupo de la tarea |
 
-**Estados de una entrega:** `EN_REVISION`, `CALIFICADO`, `POSIBLE_PLAGIO` o `ERROR`.
+**Estados de una entrega:** `EN_REVISION` → `CALIFICADO`, `POSIBLE_PLAGIO` o `ERROR`.
+- **Calificación asíncrona (RNF-09):** con la IA activa tarda unos 2 o 3 s; si estaba inactiva (arranque en frío), unos 30 s.
+- El backend reintenta las fallas transitorias de la IA (hasta 3 veces). Si la IA falla repetidamente, un *circuit breaker* marca las entregas como `ERROR` de inmediato durante 30 s.
+- Si el backend se reinicia, retoma solo las entregas que quedaron en `EN_REVISION`.
 - Con `ERROR` (el motor de IA falló), el alumno **puede volver a enviar** su ensayo. La respuesta trae un campo `mensaje` que explica qué pasó.
 - `POSIBLE_PLAGIO` **conserva la calificación** que dio el motor (RN-IA-03).
 - **Regla de plagio del backend:** hay alerta solo si la **primera coincidencia** que devuelve el motor tiene una similitud **mayor a 0.96**. Se configura con `app.ia.umbral-plagio`. La bandera `detectado` del motor, que usa 0.92, no se toma en cuenta.

@@ -19,6 +19,8 @@ public interface EnsayoRepository extends JpaRepository<Ensayo, Long> {
 
     boolean existsByTarea(Tarea tarea);
 
+    List<Ensayo> findByEstado(Ensayo.Estado estado);
+
     java.util.Optional<Ensayo> findByAlumnoAndTarea(Usuario alumno, Tarea tarea);
 
     // Historial del alumno (CU-ALU-04), de la más reciente a la más antigua

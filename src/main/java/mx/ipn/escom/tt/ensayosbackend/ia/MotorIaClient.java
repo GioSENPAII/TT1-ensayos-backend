@@ -20,4 +20,11 @@ public interface MotorIaClient {
             super(message, cause);
         }
     }
+
+    /** Falla transitoria (5xx o sin conexión): Resilience4j la reintenta (sección 4.4.6). */
+    class MotorIaReintentableException extends MotorIaException {
+        public MotorIaReintentableException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
 }

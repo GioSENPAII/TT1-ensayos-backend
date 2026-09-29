@@ -11,9 +11,10 @@ import mx.ipn.escom.tt.ensayosbackend.dto.EntregaResponse;
 import mx.ipn.escom.tt.ensayosbackend.dto.ReporteResponse;
 import mx.ipn.escom.tt.ensayosbackend.entity.*;
 import mx.ipn.escom.tt.ensayosbackend.exception.ApiException;
-import mx.ipn.escom.tt.ensayosbackend.ia.MotorIaClient;
 import mx.ipn.escom.tt.ensayosbackend.repository.*;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,40 +52,49 @@ public class EntregaService {
     private final GrupoService grupoService;
     private final PdfService pdfService;
     private final AlmacenamientoService almacenamiento;
-    private final MotorIaClient motorIa;
+    private final CalificacionWorker calificacionWorker;
+    private final PoliticaPlagio politicaPlagio;
     private final TransactionTemplate tx;
     private final ObjectMapper objectMapper;
-
-    /** La alerta de plagio se activa si la primera coincidencia del motor supera este valor. */
-    @Value("${app.ia.umbral-plagio:0.96}")
-    private BigDecimal umbralPlagio;
 
     // ---------------------------------------------------------------- Enviar ensayo (CU-ALU-02)
 
     /**
-     * 1) valida y guarda la entrega como EN_REVISION; 2) llama al motor de IA fuera de transacción;
-     * 3) guarda la calificación (CALIFICADO / POSIBLE_PLAGIO) o marca ERROR.
-     * Por ahora es síncrono; la corrección C6 lo volverá asíncrono con 202 + consulta periódica.
+     * CU-ALU-02 con calificación asíncrona (RNF-09, corrección C6): valida y guarda la entrega como
+     * EN_REVISION y responde de inmediato; el motor de IA la califica en segundo plano y el cliente
+     * consulta GET /submissions/{id} hasta que cambie el estado.
      */
     public EntregaResponse enviar(Usuario alumno, Long idTarea, MultipartFile archivo) {
         byte[] contenido = leerYValidar(archivo);
         String nombreArchivo = nombreSeguro(archivo.getOriginalFilename());
         String texto = pdfService.extraerTexto(contenido);
 
+        // La transacción se confirma aquí, antes de que el worker lea la entrega
         Long idEnsayo = tx.execute(status -> registrarEntrega(alumno, idTarea, nombreArchivo, contenido, texto));
+        encolar(idEnsayo);
 
-        try {
-            ObjectNode resultado = motorIa.calificar(contenido, nombreArchivo, idEnsayo, idTarea);
-            tx.executeWithoutResult(status -> guardarCalificacion(idEnsayo, resultado));
-        } catch (MotorIaClient.MotorIaException | IllegalArgumentException e) {
-            log.warn("Entrega {} sin calificar: {}", idEnsayo, e.getMessage());
-            tx.executeWithoutResult(status -> ensayoRepository.findById(idEnsayo)
-                    .ifPresent(en -> en.setEstado(Ensayo.Estado.ERROR)));
+        return tx.execute(status -> detalleResponse(ensayoRepository.findById(idEnsayo).orElseThrow(), false));
+    }
+
+    /** Si el servidor se reinició a mitad de una calificación, las entregas EN_REVISION se retoman. */
+    @EventListener(ApplicationReadyEvent.class)
+    public void reanudarPendientes() {
+        List<Long> pendientes = tx.execute(status -> ensayoRepository.findByEstado(Ensayo.Estado.EN_REVISION)
+                .stream().map(Ensayo::getIdEnsayo).toList());
+        if (pendientes != null && !pendientes.isEmpty()) {
+            log.info("Retomando {} entrega(s) en revisión: {}", pendientes.size(), pendientes);
+            pendientes.forEach(this::encolar);
         }
-        return tx.execute(status -> {
-            Ensayo ensayo = ensayoRepository.findById(idEnsayo).orElseThrow();
-            return detalleResponse(ensayo, false);
-        });
+    }
+
+    private void encolar(Long idEnsayo) {
+        try {
+            calificacionWorker.calificar(idEnsayo);
+        } catch (TaskRejectedException e) {
+            // Cola llena (demasiados envíos simultáneos): el alumno puede reenviar
+            log.warn("Cola de calificación llena; entrega {} marcada como ERROR", idEnsayo);
+            calificacionWorker.marcarError(idEnsayo);
+        }
     }
 
     private byte[] leerYValidar(MultipartFile archivo) {
@@ -142,38 +152,6 @@ public class EntregaService {
         ensayo.setEstado(Ensayo.Estado.EN_REVISION);
         ensayo.setFechaEntrega(LocalDateTime.now());
         return ensayoRepository.save(ensayo).getIdEnsayo();
-    }
-
-    private void guardarCalificacion(Long idEnsayo, ObjectNode resultado) {
-        Ensayo ensayo = ensayoRepository.findById(idEnsayo).orElseThrow();
-        JsonNode metadata = resultado.path("metadata");
-        JsonNode desglose = resultado.path("desglose_rubrica");
-        if (!metadata.path("calificacion_final").isNumber() || !desglose.isArray() || desglose.isEmpty()) {
-            throw new IllegalArgumentException("Respuesta del motor de IA incompleta");
-        }
-
-        boolean plagio = esPlagio(resultado);
-        BigDecimal similitud = null;
-        for (JsonNode c : resultado.path("plagio").path("coincidencias")) {
-            BigDecimal s = c.path("similarity").decimalValue();
-            if (similitud == null || s.compareTo(similitud) > 0) {
-                similitud = s;
-            }
-        }
-
-        Calificacion calificacion = calificacionRepository.findByEnsayo(ensayo)
-                .orElseGet(() -> Calificacion.builder().ensayo(ensayo).build());
-        // RN-IA-04: 0.0-10.0 redondeada a un decimal
-        calificacion.setCalificacionFinal(limitar(metadata.path("calificacion_final").decimalValue()));
-        calificacion.setSimilitudPlagio(similitud == null ? null : similitud.setScale(4, RoundingMode.HALF_UP));
-        calificacion.setReporteJson(resultado.toString());
-        calificacion.setModificadoPorDocente(false);
-        calificacion.setFechaEvaluacion(LocalDateTime.now());
-        calificacion.setFechaModificacion(null);
-        calificacionRepository.save(calificacion);
-
-        // RN-IA-03: la alerta de plagio no anula la calificación, solo cambia el estado
-        ensayo.setEstado(plagio ? Ensayo.Estado.POSIBLE_PLAGIO : Ensayo.Estado.CALIFICADO);
     }
 
     // ---------------------------------------------------------------- Consultas
@@ -339,7 +317,7 @@ public class EntregaService {
     private ReporteResponse aReporte(Calificacion calificacion, boolean vistaProfesor) {
         ObjectNode reporte = leerReporte(calificacion);
         JsonNode banderas = reporte.path("banderas_retroalimentacion");
-        boolean plagio = esPlagio(reporte);
+        boolean plagio = politicaPlagio.esPlagio(reporte);
 
         List<ReporteResponse.Criterio> criterios = new ArrayList<>();
         BigDecimal maxima = BigDecimal.ZERO;
@@ -366,13 +344,13 @@ public class EntregaService {
         ReporteResponse.ReporteResponseBuilder b = ReporteResponse.builder()
                 .calificacionFinal(calificacion.getCalificacionFinal().setScale(1, RoundingMode.HALF_UP))
                 .calificacionMaxima(maxima.setScale(1, RoundingMode.HALF_UP))
-                .observacion(observacion(reporte, plagio))
+                .observacion(politicaPlagio.observacion(reporte))
                 .fechaEvaluacion(calificacion.getFechaEvaluacion())
                 .modificadoPorDocente(calificacion.isModificadoPorDocente())
                 .fechaModificacion(calificacion.getFechaModificacion())
                 .posiblePlagio(plagio)
                 .banderas(ReporteResponse.Banderas.builder()
-                        .requiereRevisionDocente(requiereRevision(reporte, plagio))
+                        .requiereRevisionDocente(politicaPlagio.requiereRevision(reporte))
                         .faltaContextoIntro(banderas.path("falta_contexto_intro").asBoolean(false))
                         .abusoVinetas(banderas.path("abuso_vinetas").asBoolean(false))
                         .build())
@@ -387,38 +365,6 @@ public class EntregaService {
             b.similitudMaxima(calificacion.getSimilitudPlagio()).coincidencias(coincidencias);
         }
         return b.build();
-    }
-
-    /**
-     * Alerta de plagio: la similitud de la primera coincidencia devuelta por el motor debe ser mayor
-     * al umbral (0.96). La bandera "detectado" del motor, que usa 0.92, no se toma en cuenta.
-     */
-    private boolean esPlagio(JsonNode reporte) {
-        JsonNode coincidencias = reporte.path("plagio").path("coincidencias");
-        if (!coincidencias.isArray() || coincidencias.isEmpty()) {
-            return false;
-        }
-        return coincidencias.get(0).path("similarity").decimalValue().compareTo(umbralPlagio) > 0;
-    }
-
-    private static boolean motorMarcoPlagio(JsonNode reporte) {
-        return reporte.path("plagio").path("detectado").asBoolean(false)
-                || reporte.path("banderas_retroalimentacion").path("plagio_detectado").asBoolean(false);
-    }
-
-    /** Si el motor avisó plagio pero no supera el umbral, su observación sobre similitud ya no aplica. */
-    private static String observacion(JsonNode reporte, boolean plagio) {
-        String texto = reporte.path("metadata").path("observacion").asText(null);
-        if (!plagio && motorMarcoPlagio(reporte)) {
-            return null;
-        }
-        return texto;
-    }
-
-    /** La revisión docente que pidió el motor por plagio se descarta si no supera el umbral. */
-    private static boolean requiereRevision(JsonNode reporte, boolean plagio) {
-        boolean pedida = reporte.path("banderas_retroalimentacion").path("requiere_revision_docente").asBoolean(false);
-        return plagio || (pedida && !motorMarcoPlagio(reporte));
     }
 
     private ObjectNode leerReporte(Calificacion calificacion) {

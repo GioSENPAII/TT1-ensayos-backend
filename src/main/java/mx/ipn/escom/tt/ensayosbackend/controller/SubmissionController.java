@@ -25,13 +25,14 @@ public class SubmissionController {
     private final EntregaService entregaService;
     private final UsuarioActualService usuarioActual;
 
-    // CU-ALU-02: multipart con "file" (PDF ≤ 10 MB) y "assignmentId"
+    // CU-ALU-02 (asíncrono, C6): multipart con "file" (PDF ≤ 10 MB) y "assignmentId"
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ALUMNO')")
     public ResponseEntity<EntregaResponse> enviar(@RequestParam("assignmentId") Long assignmentId,
                                                   @RequestPart("file") MultipartFile file) {
         EntregaResponse entrega = entregaService.enviar(usuarioActual.obtener(), assignmentId, file);
-        return ResponseEntity.created(ServletUriComponentsBuilder.fromCurrentRequest()
+        // 202: la entrega quedó EN_REVISION; la calificación llega después (consultar Location)
+        return ResponseEntity.accepted().location(ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}").buildAndExpand(entrega.getId()).toUri()).body(entrega);
     }
 
