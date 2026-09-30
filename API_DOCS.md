@@ -11,11 +11,12 @@
 
 | Dato | Valor |
 |------|-------|
+| URL base (nube) | `https://ensayos-backend-990972460164.northamerica-south1.run.app/api/v1` |
 | URL base (local) | `http://127.0.0.1:8080/api/v1` (emulador Android: `http://10.0.2.2:8080/api/v1`) |
 | Formato | JSON (`Content-Type: application/json`) |
 | Autenticación | `Authorization: Bearer <accessToken>` |
 
-La cuenta de Google Cloud expiró, así que por ahora el backend solo corre en local (ver la sección "Base de datos local" más abajo).
+El despliegue en la nube está documentado en `deploy/README.md`. En la nube, el administrador es `glongoria.3a.is@gmail.com`; en local, `admin.ensayos@ipn.mx`.
 
 ### Formato de errores (RFC 9457)
 

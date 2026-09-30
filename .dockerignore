@@ -1,0 +1,10 @@
+# Lo que NO se sube a Cloud Build al desplegar (secretos, datos locales y compilados)
+.gcloudignore
+.git
+.gitignore
+env.yaml
+data/
+target/
+.idea/
+.vscode/
+*.log
