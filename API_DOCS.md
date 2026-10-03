@@ -216,6 +216,8 @@ El administrador recibe **403** en grupos y tareas (RN-WEB-03).
 | GET | `/submissions/{id}/grading` | Alumno dueño / Profesor del grupo | Solo el `reporte`. **404** si todavía no está calificada |
 | PATCH | `/submissions/{id}/grading` | Profesor | `{ "criterio": "Introducción", "puntaje": 0.5 }`. Valida que el puntaje esté entre 0 y el máximo, recalcula la calificación final y guarda la auditoría |
 | GET | `/submissions?assignmentId=1` | Profesor | Entregas de una tarea, cada una con los datos del `alumno` |
+| GET | `/submissions/{id}/file` | Profesor del grupo | Descarga el **PDF que subió el alumno**, en cualquier estado |
+| GET | `/submissions/{id}/similar-file` | Profesor del grupo | Solo si `posiblePlagio` es `true`: descarga el **ensayo del histórico** con mayor similitud |
 | GET | `/students/me/submissions` | Alumno | Historial, de la entrega más reciente a la más antigua |
 
 **Errores al subir un ensayo:**
@@ -244,6 +246,38 @@ El administrador recibe **403** en grupos y tareas (RN-WEB-03).
 - `detallesMotor` es el texto técnico que devolvió el motor de IA (por ejemplo "Evaluado por CU-IA-09").
 - Solo el profesor recibe además `similitudMaxima` y `coincidencias`.
 - `puntajeIa` es el valor original del motor. Aparece solo en los criterios que el docente ajustó.
+
+### Descarga de PDFs (profesor)
+
+En el detalle de una entrega:
+- Siempre muestra el botón **"Descargar ensayo"** → `GET /submissions/{id}/file`.
+- Si `reporte.posiblePlagio` es `true`, muestra también **"Descargar ensayo similar"** → `GET /submissions/{id}/similar-file`.
+
+Ambos responden `200` con `Content-Type: application/pdf` y el encabezado `Content-Disposition: attachment; filename="..."`:
+- `/file` usa el nombre original del archivo. Si tiene acentos o `ñ`, viene también en `filename*` (UTF-8).
+- `/similar-file` usa `{document_hash}.pdf`, el hash de `coincidencias[0]` (la de mayor similitud).
+
+El navegador **no** puede leer los buckets directamente (son privados): la descarga siempre pasa por el backend con el token. Con Axios:
+
+```js
+const res = await api.get(`/submissions/${id}/similar-file`, { responseType: 'blob' });
+const cd = res.headers['content-disposition'] ?? '';
+const utf8 = /filename\*=UTF-8''([^;]+)/.exec(cd)?.[1];           // nombres con acentos
+const nombre = utf8 ? decodeURIComponent(utf8) : /filename="([^"]+)"/.exec(cd)?.[1] ?? 'ensayo.pdf';
+const url = URL.createObjectURL(res.data);
+const a = Object.assign(document.createElement('a'), { href: url, download: nombre });
+a.click();
+URL.revokeObjectURL(url);
+```
+
+| Código | Causa |
+|---|---|
+| 403 | No es el profesor del grupo de la entrega (o el rol no es Profesor) |
+| 404 | La entrega no existe · el PDF no está disponible · `similar-file` en una entrega sin alerta de plagio · el histórico no tiene el ensayo con ese hash |
+
+Con `responseType: 'blob'`, el cuerpo del error también llega como `Blob`; léelo con `JSON.parse(await err.response.data.text())`.
+
+**Histórico de similitud:** los ensayos con los que compara el motor de IA se guardan en el bucket `gs://aplicacion-desarrollo-ensayos-similitud` como `{sha256}.pdf` (en local, en `data/similitud/`). Solo se comparan contra ese histórico: un ensayo copiado de otro alumno del sistema **no** se detecta (limitación conocida).
 
 ### Motor de IA
 

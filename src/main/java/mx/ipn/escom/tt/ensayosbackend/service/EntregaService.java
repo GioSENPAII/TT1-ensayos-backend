@@ -7,11 +7,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mx.ipn.escom.tt.ensayosbackend.dto.AjusteCalificacionRequest;
 import mx.ipn.escom.tt.ensayosbackend.dto.AlumnoInscritoResponse;
+import mx.ipn.escom.tt.ensayosbackend.dto.ArchivoDescarga;
 import mx.ipn.escom.tt.ensayosbackend.dto.EntregaResponse;
 import mx.ipn.escom.tt.ensayosbackend.dto.ReporteResponse;
 import mx.ipn.escom.tt.ensayosbackend.entity.*;
 import mx.ipn.escom.tt.ensayosbackend.exception.ApiException;
 import mx.ipn.escom.tt.ensayosbackend.repository.*;
+import mx.ipn.escom.tt.ensayosbackend.storage.ArchivoStore;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.task.TaskRejectedException;
@@ -191,13 +193,52 @@ public class EntregaService {
         return ensayos.stream().map(e -> resumen(e, califs.get(e.getIdEnsayo()), true)).toList();
     }
 
+    // ---------------------------------------------------------------- Descarga de PDFs (profesor)
+
+    /** El PDF que subió el alumno, en cualquier estado de la entrega. */
+    @Transactional(readOnly = true)
+    public ArchivoDescarga archivo(Usuario profesor, Long idEnsayo) {
+        Ensayo ensayo = ensayoDelProfesor(profesor, idEnsayo);
+        try {
+            return new ArchivoDescarga(ensayo.getNombreArchivo(), almacenamiento.leer(ensayo.getRutaArchivo()));
+        } catch (ArchivoStore.ArchivoNoEncontradoException e) {
+            log.warn("Entrega {} sin PDF en el almacenamiento: {}", idEnsayo, e.getMessage());
+            throw ApiException.notFound("El PDF de esta entrega no está disponible");
+        }
+    }
+
+    /**
+     * Si la entrega es posible plagio: el ensayo del histórico del motor con mayor similitud (la primera
+     * coincidencia del reporte), guardado como "{document_hash}.pdf".
+     */
+    @Transactional(readOnly = true)
+    public ArchivoDescarga archivoSimilar(Usuario profesor, Long idEnsayo) {
+        Ensayo ensayo = ensayoDelProfesor(profesor, idEnsayo);
+        ObjectNode reporte = calificacionRepository.findByEnsayo(ensayo).map(this::leerReporte).orElse(null);
+        if (reporte == null || !politicaPlagio.esPlagio(reporte)) {
+            throw ApiException.notFound("Esta entrega no tiene alerta de posible plagio");
+        }
+        String hash = reporte.path("plagio").path("coincidencias").get(0).path("document_hash").asText();
+        try {
+            return new ArchivoDescarga(hash + ".pdf", almacenamiento.leerSimilar(hash));
+        } catch (ArchivoStore.ArchivoNoEncontradoException e) {
+            log.warn("Entrega {}: el histórico no tiene el ensayo {}", idEnsayo, hash);
+            throw ApiException.notFound("El ensayo similar no está disponible en el histórico");
+        }
+    }
+
+    private Ensayo ensayoDelProfesor(Usuario profesor, Long idEnsayo) {
+        Ensayo ensayo = ensayoRepository.findById(idEnsayo)
+                .orElseThrow(() -> ApiException.notFound("La entrega no existe"));
+        grupoService.grupoDelProfesor(profesor, ensayo.getTarea().getGrupo().getIdGrupo());
+        return ensayo;
+    }
+
     // ---------------------------------------------------------------- Ajuste del profesor (CU-WEB-02)
 
     @Transactional
     public ReporteResponse ajustar(Usuario profesor, Long idEnsayo, AjusteCalificacionRequest request) {
-        Ensayo ensayo = ensayoRepository.findById(idEnsayo)
-                .orElseThrow(() -> ApiException.notFound("La entrega no existe"));
-        grupoService.grupoDelProfesor(profesor, ensayo.getTarea().getGrupo().getIdGrupo());
+        Ensayo ensayo = ensayoDelProfesor(profesor, idEnsayo);
         Calificacion calificacion = calificacionRepository.findByEnsayo(ensayo)
                 .orElseThrow(() -> ApiException.conflict("Esta entrega aún no tiene calificación"));
 

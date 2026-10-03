@@ -1,25 +1,35 @@
 package mx.ipn.escom.tt.ensayosbackend.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mx.ipn.escom.tt.ensayosbackend.storage.ArchivoStore;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
- * PDFs de las entregas. Dónde se guardan lo decide app.storage.tipo: "disco" en desarrollo o
- * "gcs" (bucket de Cloud Storage) en la nube, como prevé la sección 4.2.
+ * PDFs de las entregas y del histórico de similitud. Dónde se guardan lo decide app.storage.tipo:
+ * "disco" en desarrollo o "gcs" (bucket de Cloud Storage) en la nube, como prevé la sección 4.2.
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AlmacenamientoService {
 
+    private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
+
     private final ArchivoStore store;
+    private final ArchivoStore similitud;
+
+    public AlmacenamientoService(@Qualifier("entregasStore") ArchivoStore store,
+                                 @Qualifier("similitudStore") ArchivoStore similitud) {
+        this.store = store;
+        this.similitud = similitud;
+    }
 
     /** Devuelve la ruta relativa guardada en ensayos.ruta_archivo. */
     public String guardar(byte[] contenido, Long idTarea, Long idAlumno) {
@@ -30,6 +40,19 @@ public class AlmacenamientoService {
 
     public byte[] leer(String relativa) {
         return store.leer(relativa);
+    }
+
+    /**
+     * Ensayo del histórico del motor de IA, guardado como "{hash}.pdf".
+     *
+     * @throws ArchivoStore.ArchivoNoEncontradoException si el histórico no tiene ese ensayo
+     */
+    public byte[] leerSimilar(String hash) {
+        String h = hash == null ? "" : hash.toLowerCase(Locale.ROOT);
+        if (!SHA256.matcher(h).matches()) {
+            throw new ArchivoStore.ArchivoNoEncontradoException(hash + ".pdf");
+        }
+        return similitud.leer(h + ".pdf");
     }
 
     /**

@@ -1,24 +1,20 @@
 package mx.ipn.escom.tt.ensayosbackend.storage;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 
-/** Desarrollo local: disco (app.storage.dir). */
+/** Desarrollo local: una carpeta en disco. */
 @Slf4j
-@Component
-@ConditionalOnProperty(name = "app.storage.tipo", havingValue = "disco", matchIfMissing = true)
 public class DiscoArchivoStore implements ArchivoStore {
 
     private final Path raiz;
 
-    public DiscoArchivoStore(@Value("${app.storage.dir}") String dir) {
+    public DiscoArchivoStore(String dir) {
         this.raiz = Path.of(dir).toAbsolutePath().normalize();
         log.info("PDFs en disco: {}", raiz);
     }
@@ -38,6 +34,8 @@ public class DiscoArchivoStore implements ArchivoStore {
     public byte[] leer(String ruta) {
         try {
             return Files.readAllBytes(resolver(ruta));
+        } catch (NoSuchFileException e) {
+            throw new ArchivoNoEncontradoException(ruta);
         } catch (IOException e) {
             throw new UncheckedIOException("No se pudo leer el PDF", e);
         }

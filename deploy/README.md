@@ -12,6 +12,7 @@
 | Cloud Run | `ensayos-backend` | 1 vCPU, 1 GiB, de 0 a 1 instancias, **CPU siempre asignada** (la calificación es asíncrona) |
 | Cloud SQL | `ensayos-db` (MySQL 8.0, db-f1-micro) | Base de datos `ensayos_db`, zona horaria `-06:00`, `utf8mb4` |
 | Cloud Storage | `gs://aplicacion-desarrollo-ensayos-pdfs` | PDFs de las entregas. Privado; solo lo lee y escribe el backend |
+| Cloud Storage | `gs://aplicacion-desarrollo-ensayos-similitud` | Histórico del motor de IA, cada ensayo como `{sha256}.pdf`. Privado; el backend solo lo lee (`roles/storage.objectViewer`) |
 | Artifact Registry | `ensayos-repo` | Imágenes del backend |
 | Cuenta de servicio | `ensayos-backend@aplicacion-desarrollo.iam.gserviceaccount.com` | Cloud SQL Client, acceso a los objetos del bucket y a 4 secretos |
 
@@ -63,3 +64,16 @@ flutter run --dart-define=API_URL=https://ensayos-backend-990972460164.northamer
   - Detener la instancia cuando no se ocupe: `gcloud sql instances patch ensayos-db --activation-policy NEVER`
   - Volver a encenderla: `--activation-policy ALWAYS`
 - **Cloud Run** cobra solo mientras la instancia está encendida, que es hasta unos 15 minutos después de la última petición.
+
+## Actualizar el histórico de similitud
+
+Cuando el compañero de IA cambie su histórico, reemplaza el contenido del bucket. Los archivos deben llamarse `{sha256 del archivo}.pdf`, el mismo hash que devuelve el motor en `document_hash`:
+
+```bash
+# Comprobar que cada nombre coincide con su hash (no debe imprimir nada)
+for f in carpeta/*.pdf; do [ "$(shasum -a 256 "$f" | cut -c1-64).pdf" = "$(basename "$f")" ] || echo "MAL: $f"; done
+# Sincronizar (borra del bucket lo que ya no está en la carpeta)
+gcloud storage rsync --delete-unmatched-destination-objects carpeta gs://aplicacion-desarrollo-ensayos-similitud
+```
+
+No hace falta redesplegar el backend.
