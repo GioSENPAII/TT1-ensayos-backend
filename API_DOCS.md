@@ -236,7 +236,7 @@ El administrador recibe **403** en grupos y tareas (RN-WEB-03).
 - Si el backend se reinicia, retoma solo las entregas que quedaron en `EN_REVISION`.
 - Con `ERROR` (el motor de IA falló), el alumno **puede volver a enviar** su ensayo. La respuesta trae un campo `mensaje` que explica qué pasó.
 - `POSIBLE_PLAGIO` **conserva la calificación** que dio el motor (RN-IA-03).
-- **Regla de plagio del backend:** hay alerta solo si la **primera coincidencia** que devuelve el motor tiene una similitud **mayor a 0.96**. Se configura con `app.ia.umbral-plagio`. La bandera `detectado` del motor, que usa 0.92, no se toma en cuenta.
+- **Regla de plagio del backend:** hay alerta solo si la **primera coincidencia** que devuelve el motor tiene una similitud **mayor a 0.98**. Se configura con `app.ia.umbral-plagio`. La bandera `detectado` del motor, que usa 0.92, no se toma en cuenta.
   - Cuando no se supera el umbral, `posiblePlagio` es `false`.
   - Además se omite la observación del motor sobre similitud histórica y `requiereRevisionDocente` queda en `false` si el motor solo lo pedía por plagio.
 

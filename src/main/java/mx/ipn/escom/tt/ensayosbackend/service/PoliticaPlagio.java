@@ -8,14 +8,14 @@ import java.math.BigDecimal;
 
 /**
  * Regla de la alerta "Posible Plagio" (RN-IA-03 corregida, D4): la primera coincidencia devuelta por
- * el motor debe superar el umbral (0.96). La bandera "detectado" del motor (0.92) no se considera.
+ * el motor debe superar el umbral (0.98). La bandera "detectado" del motor (0.92) no se considera.
  */
 @Component
 public class PoliticaPlagio {
 
     private final BigDecimal umbral;
 
-    public PoliticaPlagio(@Value("${app.ia.umbral-plagio:0.96}") BigDecimal umbral) {
+    public PoliticaPlagio(@Value("${app.ia.umbral-plagio:0.98}") BigDecimal umbral) {
         this.umbral = umbral;
     }
 
