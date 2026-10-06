@@ -13,6 +13,7 @@
 | Cloud SQL | `ensayos-db` (MySQL 8.0, db-f1-micro) | Base de datos `ensayos_db`, zona horaria `-06:00`, `utf8mb4` |
 | Cloud Storage | `gs://aplicacion-desarrollo-ensayos-pdfs` | PDFs de las entregas. Privado; solo lo lee y escribe el backend |
 | Cloud Storage | `gs://aplicacion-desarrollo-ensayos-similitud` | Histórico del motor de IA, cada ensayo como `{sha256}.pdf`. Privado; el backend solo lo lee (`roles/storage.objectViewer`) |
+| Cloud Storage | `gs://aplicacion-desarrollo-descargas` | **Público (solo lectura de objetos)**: el APK de la app, `ensayos-movil.apk`. Se publica con `ensayos_movil/scripts/publicar_apk.sh` |
 | Artifact Registry | `ensayos-repo` | Imágenes del backend |
 | Cuenta de servicio | `ensayos-backend@aplicacion-desarrollo.iam.gserviceaccount.com` | Cloud SQL Client, acceso a los objetos del bucket y a 4 secretos |
 
@@ -25,6 +26,7 @@
 | `ensayos-jwt-secret` | Clave nueva para firmar los JWT. **No** es la que quedó publicada en el historial de git |
 | `ensayos-mail-password` | Contraseña de aplicación de Gmail |
 | `ensayos-ai-api-key` | Llave del microservicio de IA |
+| `ensayos-apk-keystore` / `ensayos-apk-key-properties` | Respaldo de la llave de firma del APK y su contraseña. Para recuperarla: `gcloud secrets versions access latest --secret ensayos-apk-keystore --out-file=llaves/ensayos-release.jks` (y lo mismo con `key.properties`) |
 
 Ninguna contraseña está en el código ni en `env.yaml`. Para leer una: `gcloud secrets versions access latest --secret <nombre>`.
 
