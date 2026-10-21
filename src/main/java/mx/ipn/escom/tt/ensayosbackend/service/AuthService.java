@@ -104,6 +104,9 @@ public class AuthService {
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .rol(token.getRolPendiente())
                 .estado(Usuario.Estado.ACTIVA)
+                // El aviso se aceptó en el paso 1, cuando se generó el código
+                .avisoPrivacidadVersion(AvisoPrivacidadService.VERSION)
+                .avisoPrivacidadFecha(token.getFechaCreacion())
                 .build());
 
         token.setUsuario(usuario);

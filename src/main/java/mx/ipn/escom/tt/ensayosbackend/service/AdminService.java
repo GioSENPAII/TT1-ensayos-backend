@@ -3,6 +3,7 @@ package mx.ipn.escom.tt.ensayosbackend.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mx.ipn.escom.tt.ensayosbackend.dto.CuentaResponse;
+import mx.ipn.escom.tt.ensayosbackend.dto.EntregaResponse;
 import mx.ipn.escom.tt.ensayosbackend.dto.EstadoCuentaRequest;
 import mx.ipn.escom.tt.ensayosbackend.dto.MetricasResponse;
 import mx.ipn.escom.tt.ensayosbackend.dto.PaginaResponse;
@@ -16,6 +17,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -37,6 +39,7 @@ public class AdminService {
     private final EnsayoRepository ensayoRepository;
     private final TokenService tokenService;
     private final AlmacenamientoService almacenamiento;
+    private final EntregaService entregaService;
 
     /** Directorio de alumnos y profesores, con filtros por rol, estado y texto (correo o nombre). */
     @Transactional(readOnly = true)
@@ -80,13 +83,62 @@ public class AdminService {
     @Transactional
     public void eliminar(Long id) {
         Usuario usuario = gestionable(id, "eliminar");
-        List<String> pdfs = usuario.getRol() == Usuario.Rol.PROFESOR
+        List<String> pdfs = new ArrayList<>(usuario.getRol() == Usuario.Rol.PROFESOR
                 ? ensayoRepository.rutasDeProfesor(usuario)
-                : ensayoRepository.rutasDeAlumno(usuario);
+                : ensayoRepository.rutasDeAlumno(usuario));
+        if (usuario.tieneFoto()) {
+            pdfs.add(usuario.getFotoPerfil());
+        }
         usuarioRepository.delete(usuario);
         usuarioRepository.flush(); // si la cascada falla, que falle aquí y se revierta completa
         almacenamiento.eliminarAlConfirmar(pdfs);
         log.info("Cuenta eliminada: {} ({}), {} PDF(s)", usuario.getCorreo(), usuario.getRol(), pdfs.size());
+    }
+
+    /**
+     * Entregas de un alumno, para que el administrador elija cuál eliminar. Sin calificación ni mensaje:
+     * el administrador no ve calificaciones (RN-WEB-03), solo qué se entregó, cuándo y en qué estado.
+     */
+    @Transactional(readOnly = true)
+    public List<EntregaResponse> entregasDeAlumno(Long idAlumno) {
+        List<EntregaResponse> entregas = entregaService.historial(alumno(idAlumno));
+        entregas.forEach(e -> {
+            e.setCalificacionFinal(null);
+            e.setModificadoPorDocente(null);
+            e.setMensaje(null);
+        });
+        return entregas;
+    }
+
+    /**
+     * Elimina una entrega con su calificación y auditoría (ON DELETE CASCADE) para que el alumno pueda
+     * volver a subir el ensayo. Es la única excepción a RN-WEB-04; si la tarea ya cerró, el alumno solo
+     * podrá reenviar si el profesor amplía la fecha límite (RN-WEB-02).
+     */
+    @Transactional
+    public void eliminarEntrega(Long idAlumno, Long idEnsayo) {
+        Usuario alumno = alumno(idAlumno);
+        Ensayo ensayo = ensayoRepository.findById(idEnsayo)
+                .filter(e -> e.getAlumno().getIdUsuario().equals(alumno.getIdUsuario()))
+                .orElseThrow(() -> ApiException.notFound("La entrega no existe"));
+        if (ensayo.getEstado() == Ensayo.Estado.EN_REVISION) {
+            // El motor la está calificando: borrarla ahora dejaría al proceso en segundo plano sin entrega
+            throw ApiException.conflict("La entrega se está calificando. Intenta de nuevo cuando termine.");
+        }
+        String ruta = ensayo.getRutaArchivo();
+        ensayoRepository.delete(ensayo);
+        ensayoRepository.flush();
+        almacenamiento.eliminarAlConfirmar(List.of(ruta));
+        log.info("Entrega {} de {} (tarea {}) eliminada por el administrador",
+                idEnsayo, alumno.getCorreo(), ensayo.getTarea().getIdTarea());
+    }
+
+    private Usuario alumno(Long id) {
+        Usuario usuario = gestionable(id, "consultar");
+        if (usuario.getRol() != Usuario.Rol.ALUMNO) {
+            throw ApiException.badRequest("La cuenta no es de un alumno");
+        }
+        return usuario;
     }
 
     @Transactional(readOnly = true)
@@ -145,6 +197,7 @@ public class AdminService {
                 .rol(u.getRol().name())
                 .estado(u.getEstado().name())
                 .fechaRegistro(u.getFechaRegistro())
+                .tieneFoto(u.tieneFoto())
                 .build();
     }
 }

@@ -87,6 +87,7 @@ public class GrupoService {
                         .apellidos(i.getAlumno().getApellidos())
                         .correo(i.getAlumno().getCorreo())
                         .fechaInscripcion(i.getFechaInscripcion())
+                        .tieneFoto(i.getAlumno().tieneFoto())
                         .build())
                 .toList();
     }

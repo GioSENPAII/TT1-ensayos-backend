@@ -27,5 +27,9 @@ public interface InscripcionRepository extends JpaRepository<Inscripcion, Long> 
 
     long countByGrupo(Grupo grupo);
 
+    // El profesor da clase al alumno en al menos uno de sus grupos (acceso a la foto de perfil)
+    @Query("SELECT COUNT(i) > 0 FROM Inscripcion i WHERE i.grupo.profesor = :profesor AND i.alumno = :alumno")
+    boolean existeProfesorDeAlumno(@Param("profesor") Usuario profesor, @Param("alumno") Usuario alumno);
+
     long countByAlumno(Usuario alumno);
 }

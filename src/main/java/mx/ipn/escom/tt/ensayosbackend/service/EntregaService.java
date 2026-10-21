@@ -350,6 +350,7 @@ public class EntregaService {
             Usuario a = e.getAlumno();
             b.alumno(AlumnoInscritoResponse.builder()
                     .id(a.getIdUsuario()).nombre(a.getNombre()).apellidos(a.getApellidos()).correo(a.getCorreo())
+                    .tieneFoto(a.tieneFoto())
                     .build());
         }
         return b.build();

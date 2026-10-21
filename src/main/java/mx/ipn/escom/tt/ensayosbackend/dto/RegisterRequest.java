@@ -1,5 +1,6 @@
 package mx.ipn.escom.tt.ensayosbackend.dto;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -19,4 +20,7 @@ public class RegisterRequest {
     private String correo;
     @NotBlank(message = "El rol es obligatorio")
     private String rol;
+    // El registro no procede sin aceptar el aviso de privacidad (GET /auth/privacy-notice)
+    @AssertTrue(message = "Debes aceptar el aviso de privacidad")
+    private boolean aceptaAvisoPrivacidad;
 }

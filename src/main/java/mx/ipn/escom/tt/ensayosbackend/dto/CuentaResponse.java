@@ -22,6 +22,8 @@ public class CuentaResponse {
     private String rol;
     private String estado;
     private LocalDateTime fechaRegistro;
+    /** Si es true, la foto está en GET /profile/{id}/photo. */
+    private Boolean tieneFoto;
     /** Solo en el detalle: lo que se borraría al eliminar la cuenta (RF-ADM-03). */
     private Impacto impacto;
 

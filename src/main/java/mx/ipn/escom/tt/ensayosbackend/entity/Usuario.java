@@ -47,6 +47,21 @@ public class Usuario {
     @Builder.Default
     private LocalDateTime fechaRegistro = LocalDateTime.now();
 
+    // Versión del aviso de privacidad aceptada y cuándo; NULL para el administrador (se crea en la BD)
+    @Column(name = "aviso_privacidad_version", length = 20)
+    private String avisoPrivacidadVersion;
+
+    @Column(name = "aviso_privacidad_fecha")
+    private LocalDateTime avisoPrivacidadFecha;
+
+    // Ruta de la foto de perfil en el almacenamiento (JPEG); NULL si no tiene
+    @Column(name = "foto_perfil", length = 500)
+    private String fotoPerfil;
+
+    public boolean tieneFoto() {
+        return fotoPerfil != null;
+    }
+
     public enum Rol { ALUMNO, PROFESOR, ADMINISTRADOR }
     public enum Estado { ACTIVA, SUSPENDIDA }
 }

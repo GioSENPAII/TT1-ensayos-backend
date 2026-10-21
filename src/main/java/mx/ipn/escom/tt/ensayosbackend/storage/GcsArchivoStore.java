@@ -24,7 +24,8 @@ public class GcsArchivoStore implements ArchivoStore {
 
     @Override
     public void escribir(String ruta, byte[] contenido) {
-        BlobInfo info = BlobInfo.newBuilder(BlobId.of(bucket, ruta)).setContentType("application/pdf").build();
+        String tipo = ruta.endsWith(".jpg") ? "image/jpeg" : "application/pdf";
+        BlobInfo info = BlobInfo.newBuilder(BlobId.of(bucket, ruta)).setContentType(tipo).build();
         storage.create(info, contenido);
     }
 

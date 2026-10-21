@@ -5,8 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import mx.ipn.escom.tt.ensayosbackend.exception.ApiException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.mail.SimpleMailMessage;
+import jakarta.mail.internet.MimeMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -21,6 +22,13 @@ public class EmailService {
     // En desarrollo local se puede desactivar (MAIL_ENABLED=false): el código solo se escribe en el log
     @Value("${app.mail.enabled:true}")
     private boolean mailEnabled;
+
+    @Value("${spring.mail.username:}")
+    private String cuentaRemitente;
+
+    // Nombre que ve el destinatario en lugar de la dirección de Gmail
+    @Value("${app.mail.remitente-nombre:Sistema de Calificación de Ensayos ESCOM}")
+    private String nombreRemitente;
 
     public void enviarTokenRegistro(String destinatario, String codigo) {
         enviar(destinatario, "Tu código de verificación — ESCOM",
@@ -53,10 +61,12 @@ public class EmailService {
             return;
         }
         try {
-            SimpleMailMessage msg = new SimpleMailMessage();
-            msg.setTo(destinatario);
-            msg.setSubject(asunto);
-            msg.setText(cuerpo);
+            MimeMessage msg = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(msg, "UTF-8");
+            helper.setFrom(cuentaRemitente, nombreRemitente);
+            helper.setTo(destinatario);
+            helper.setSubject(asunto);
+            helper.setText(cuerpo);
             mailSender.send(msg);
             log.debug("Correo \"{}\" enviado a {}", asunto, destinatario);
         } catch (Exception e) {

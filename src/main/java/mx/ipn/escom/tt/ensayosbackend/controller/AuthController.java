@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import mx.ipn.escom.tt.ensayosbackend.dto.*;
 import mx.ipn.escom.tt.ensayosbackend.service.AuthService;
+import mx.ipn.escom.tt.ensayosbackend.service.AvisoPrivacidadService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +15,12 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final AvisoPrivacidadService avisoPrivacidadService;
+
+    @GetMapping("/privacy-notice")
+    public AvisoPrivacidadResponse privacyNotice() {
+        return avisoPrivacidadService.obtener();
+    }
 
     @PostMapping("/register")
     public MessageResponse register(@Valid @RequestBody RegisterRequest request) {

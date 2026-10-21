@@ -4,7 +4,7 @@
 > - `verify-token` ahora **requiere `correo`**.
 > - El `refreshToken` ya no es un JWT: es una cadena opaca de un solo uso. Cada renovación devuelve uno nuevo.
 > - Nuevos endpoints: `resend-token`, `refresh-token`, `logout`, `forgot-password`, `reset-password`, `admin/request-otp` y `admin/verify-otp`.
-> - Contraseñas: mínimo 8 caracteres, con al menos una mayúscula, una minúscula y un número.
+> - Contraseñas: mínimo 8 caracteres, con al menos una mayúscula, una minúscula, un número y un carácter especial (cualquier símbolo que no sea letra, número ni espacio, p. ej. `! # $ % * .`). Las cuentas creadas antes de esta regla siguen entrando con su contraseña; la regla se aplica al registrarse y al restablecerla.
 > - Los errores usan el formato RFC 9457 y siguen incluyendo el campo `error`.
 
 ## Información general
@@ -58,8 +58,9 @@ Se usan para la verificación de registro (15 min), el OTP del administrador (10
 
 ### POST `/auth/register` — paso 1: enviar código
 ```json
-{ "nombre": "Juan", "apellidos": "Pérez López", "correo": "juan.perez@alumno.ipn.mx", "rol": "ALUMNO" }
+{ "nombre": "Juan", "apellidos": "Pérez López", "correo": "juan.perez@alumno.ipn.mx", "rol": "ALUMNO", "aceptaAvisoPrivacidad": true }
 ```
+- `aceptaAvisoPrivacidad` es **obligatorio** y debe ser `true`: el formulario debe tener una casilla "He leído y acepto el aviso de privacidad" con enlace al aviso. Si falta o es `false` → **400** `"Debes aceptar el aviso de privacidad"` (en `campos.aceptaAvisoPrivacidad`). El servidor guarda la versión aceptada y la fecha.
 - `rol` puede ser `ALUMNO` (correo `@alumno.ipn.mx`) o `PROFESOR` (correo `@ipn.mx`).
 - **200:** `{ "message": "Código de verificación enviado a juan.perez@alumno.ipn.mx" }`
 - **400:** el dominio no corresponde al rol. **409:** el correo ya está registrado.
@@ -80,6 +81,10 @@ Se usan para la verificación de registro (15 min), el OTP del administrador (10
 - **400:** código incorrecto o expirado, intentos agotados, o contraseña fuera de la política.
 
 ---
+
+### GET `/auth/privacy-notice` — aviso de privacidad (público)
+- **200:** `{ "version": "1.0", "fechaActualizacion": "2026-10-21", "contenido": "# Aviso de privacidad integral\n..." }`
+- `contenido` está en Markdown (títulos `#`/`##`, listas `-`/`1.` y `**negritas**`). La app y la web lo muestran desde aquí para que siempre sea la misma versión.
 
 ## Sesión
 
@@ -181,10 +186,32 @@ Las fechas usan el formato ISO local, sin zona horaria, por ejemplo `"2026-10-10
 | GET | `/groups/{id}` | — | **200** grupo. **403** si el grupo no es tuyo. **404** si no existe |
 | PATCH | `/groups/{id}/status` | `{ "estado": "INACTIVO" }` | **200** grupo. Un grupo `INACTIVO` no acepta nuevas inscripciones (RN-WEB-01) |
 | DELETE | `/groups/{id}` | — | **204**. Borra en cascada tareas, entregas y calificaciones |
-| GET | `/groups/{id}/students` | — | **200** `[{ id, nombre, apellidos, correo, fechaInscripcion }]` en orden alfabético |
+| GET | `/groups/{id}/students` | — | **200** `[{ id, nombre, apellidos, correo, fechaInscripcion, tieneFoto }]` en orden alfabético |
 | DELETE | `/groups/{id}/students/{studentId}` | — | **204**. Saca al alumno del grupo y borra sus entregas en ese grupo |
 
 `grupo` = `{ id, nombre, codigoAcceso, estado: "ACTIVO"|"INACTIVO", fechaCreacion, totalAlumnos, totalTareas }`
+
+### Rendimiento para las gráficas (profesor)
+
+Los promedios son de las entregas **calificadas** (`CALIFICADO` y `POSIBLE_PLAGIO`, con el ajuste del profesor si lo hubo), en escala 0–10 con un decimal. Valen `null` cuando no hay entregas calificadas.
+
+| Método | Endpoint | Respuesta |
+|---|---|---|
+| GET | `/groups/performance` | **200** `[{ grupoId, grupo, alumnosInscritos, entregasCalificadas, promedio }]`: un elemento por grupo, para comparar grupos (gráfica de barras) |
+| GET | `/groups/{id}/performance` | **200** detalle del grupo (abajo). **403** si el grupo no es tuyo |
+
+```json
+{
+  "grupoId": 3, "grupo": "Sistemas Operativos 3CM1",
+  "alumnosInscritos": 25, "entregasCalificadas": 60, "promedioGeneral": 8.4,
+  "distribucion": [ { "rango": "0–5.9", "desde": 0, "hasta": 6, "entregas": 3 }, "... 6–6.9, 7–7.9, 8–8.9, 9–10" ],
+  "tareas":   [ { "tareaId": 6, "tarea": "Ensayo Unidad 1", "fechaCierre": "2026-10-25T17:44:14",
+                  "entregasCalificadas": 20, "promedio": 8.1, "minima": 5.5, "maxima": 10.0 } ],
+  "alumnos":  [ { "alumnoId": 3, "nombre": "Ana", "apellidos": "López", "entregasCalificadas": 3, "promedio": 8.8 } ],
+  "criterios":[ { "criterio": "Desarrollo", "promedio": 3.6, "puntajeMaximo": 4.0, "porcentaje": 90.0 } ]
+}
+```
+Gráficas sugeridas: `distribucion` → histograma; `tareas` (ordenadas por fecha de cierre) → línea o barras con la evolución del grupo; `alumnos` → barras por alumno (incluye a los inscritos sin entregas, con `promedio: null`); `criterios` → barras o radar con `porcentaje`.
 
 ### Alumno
 | Método | Endpoint | Cuerpo | Respuesta |
@@ -290,6 +317,17 @@ El backend reenvía el PDF, **con su nombre original**, al microservicio `POST /
 
 ---
 
+## Foto de perfil (todos los roles)
+
+| Método | Endpoint | Notas |
+|---|---|---|
+| PUT | `/profile/photo` | `multipart/form-data` con `file`: **JPG o PNG** de hasta 5 MB. **204**. El servidor la recorta a 512 px máximo, la guarda como JPEG y descarta los metadatos (EXIF/GPS). **400** si no es JPG/PNG o pesa más |
+| DELETE | `/profile/photo` | **204** (también si no había foto) |
+| GET | `/profile/photo` | **200** `image/jpeg` con la foto propia. **404** si no tiene |
+| GET | `/profile/{id}/photo` | **200** `image/jpeg`. La ven: el propio usuario, el administrador, el profesor de un grupo donde está inscrito el alumno y el alumno inscrito en un grupo del profesor. **403** a cualquier otro. **404** si no tiene foto |
+
+Las imágenes requieren el header `Authorization`, así que no sirven en un `<img src>` directo: en la web hay que descargarlas con Axios (`responseType: 'blob'`) y usar `URL.createObjectURL`. `tieneFoto` en las listas de alumnos y en `cuenta` evita pedir fotos que no existen.
+
 ## Administrador (CU-WEB-03, RF-ADM-01 a 03)
 
 Todos requieren el token de una sesión de **administrador** (obtenida con `admin/verify-otp`). Cualquier otro rol recibe **403**. El administrador **nunca** ve ensayos ni calificaciones (RN-WEB-03), solo conteos.
@@ -300,9 +338,11 @@ Todos requieren el token de una sesión de **administrador** (obtenida con `admi
 | GET | `/users?rol=&estado=&q=&page=0&size=20` | Directorio **paginado** de alumnos y profesores. `rol` puede ser `ALUMNO` o `PROFESOR`; `estado`, `ACTIVA` o `SUSPENDIDA`; `q` busca en el correo o el nombre. Devuelve `{ contenido: [cuenta], pagina, tamano, totalElementos, totalPaginas }` |
 | GET | `/users/{id}` | La cuenta y su `impacto`, para el diálogo de confirmación antes de eliminar: `{ inscripciones?, grupos?, tareas?, entregas, advertencia }`. `advertencia` trae el texto de CU-WEB-03 4c/4d con los números reales |
 | PATCH | `/users/{id}/status` | `{ "estado": "SUSPENDIDA" }` o `{ "estado": "ACTIVA" }`. Al suspender, **se cierran las sesiones abiertas** de esa cuenta |
+| GET | `/users/{id}/submissions` | **200** `[{ id, nombreArchivo, tamanoBytes, fechaEntrega, tareaId, tarea, grupoId, grupo, estado }]` del alumno, de la más reciente a la más antigua. **Sin calificación** (RN-WEB-03). **400** si la cuenta no es de un alumno |
+| DELETE | `/users/{id}/submissions/{submissionId}` | **204**. Borra la entrega, su calificación y su PDF para que el alumno **pueda volver a subir** el ensayo (única excepción a RN-WEB-04). **409** si la entrega se está calificando (`EN_REVISION`). **404** si la entrega no es de ese alumno. Si la tarea ya cerró, el alumno solo podrá reenviar si el profesor amplía la fecha de cierre |
 | DELETE | `/users/{id}` | **204**. Elimina en cascada y en una sola transacción. Profesor: sus grupos, tareas, entregas y calificaciones; los alumnos conservan sus cuentas. Alumno: sus inscripciones, entregas y calificaciones. Los PDF se borran del disco |
 
-`cuenta` = `{ id, correo, nombre, apellidos, rol, estado, fechaRegistro }`
+`cuenta` = `{ id, correo, nombre, apellidos, rol, estado, fechaRegistro, tieneFoto }`
 
 La cuenta del administrador **no se puede consultar, suspender ni eliminar** desde estos endpoints (**403**, CU-WEB-03 E1).
 

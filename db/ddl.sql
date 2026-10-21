@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
     rol            ENUM('ALUMNO','PROFESOR','ADMINISTRADOR') NOT NULL,
     estado         ENUM('ACTIVA','SUSPENDIDA') NOT NULL DEFAULT 'ACTIVA',
     fecha_registro DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    aviso_privacidad_version VARCHAR(20) NULL,    -- versión del aviso aceptada al registrarse
+    aviso_privacidad_fecha   DATETIME    NULL,    -- NULL para el administrador (se crea en la BD)
+    foto_perfil    VARCHAR(500)    NULL,          -- ruta del JPEG en el almacenamiento
     PRIMARY KEY (id_usuario),
     UNIQUE KEY uq_usuarios_correo (correo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

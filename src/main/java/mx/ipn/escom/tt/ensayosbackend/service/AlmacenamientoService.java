@@ -38,6 +38,13 @@ public class AlmacenamientoService {
         return relativa;
     }
 
+    /** Foto de perfil ya convertida a JPEG; devuelve la ruta relativa guardada en usuarios.foto_perfil. */
+    public String guardarFoto(byte[] jpeg, Long idUsuario) {
+        String relativa = "fotos/usuario-" + idUsuario + "-" + UUID.randomUUID() + ".jpg";
+        store.escribir(relativa, jpeg);
+        return relativa;
+    }
+
     public byte[] leer(String relativa) {
         return store.leer(relativa);
     }

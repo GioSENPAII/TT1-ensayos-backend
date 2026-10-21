@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import mx.ipn.escom.tt.ensayosbackend.dto.*;
 import mx.ipn.escom.tt.ensayosbackend.service.GrupoService;
+import mx.ipn.escom.tt.ensayosbackend.service.RendimientoService;
 import mx.ipn.escom.tt.ensayosbackend.service.UsuarioActualService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,6 +21,7 @@ public class GroupController {
 
     private final GrupoService grupoService;
     private final UsuarioActualService usuarioActual;
+    private final RendimientoService rendimientoService;
 
     @PostMapping
     @PreAuthorize("hasRole('PROFESOR')")
@@ -33,6 +35,20 @@ public class GroupController {
     @PreAuthorize("hasRole('PROFESOR')")
     public List<GrupoResponse> listar() {
         return grupoService.listarDelProfesor(usuarioActual.obtener());
+    }
+
+    // Gráficas de rendimiento: promedio de cada grupo del profesor
+    @GetMapping("/performance")
+    @PreAuthorize("hasRole('PROFESOR')")
+    public List<ResumenRendimientoResponse> rendimiento() {
+        return rendimientoService.resumen(usuarioActual.obtener());
+    }
+
+    // Gráficas de rendimiento de un grupo: por tarea, por alumno, por criterio y distribución
+    @GetMapping("/{id}/performance")
+    @PreAuthorize("hasRole('PROFESOR')")
+    public RendimientoGrupoResponse rendimientoGrupo(@PathVariable Long id) {
+        return rendimientoService.detalle(usuarioActual.obtener(), id);
     }
 
     @GetMapping("/{id}")

@@ -18,4 +18,6 @@ public class AlumnoInscritoResponse {
     private String apellidos;
     private String correo;
     private LocalDateTime fechaInscripcion;
+    /** Si es true, la foto está en GET /profile/{id}/photo. */
+    private Boolean tieneFoto;
 }
