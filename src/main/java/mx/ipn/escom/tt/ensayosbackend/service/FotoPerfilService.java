@@ -1,5 +1,7 @@
 package mx.ipn.escom.tt.ensayosbackend.service;
 
+import com.drew.imaging.ImageMetadataReader;
+import com.drew.metadata.exif.ExifIFD0Directory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mx.ipn.escom.tt.ensayosbackend.entity.Usuario;
@@ -20,6 +22,7 @@ import javax.imageio.stream.ImageOutputStream;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -112,7 +115,8 @@ public class FotoPerfilService {
     }
 
     private static byte[] aJpeg(byte[] original) throws IOException {
-        BufferedImage imagen = decodificar(original);
+        // Los metadatos se descartan al recodificar, así que el giro indicado en el EXIF se aplica antes
+        BufferedImage imagen = orientar(decodificar(original), orientacionExif(original));
         double escala = Math.min(1.0, (double) LADO_FINAL / Math.max(imagen.getWidth(), imagen.getHeight()));
         int ancho = Math.max(1, (int) Math.round(imagen.getWidth() * escala));
         int alto = Math.max(1, (int) Math.round(imagen.getHeight() * escala));
@@ -139,6 +143,50 @@ public class FotoPerfilService {
             writer.dispose();
         }
         return salida.toByteArray();
+    }
+
+    /**
+     * Valor de la etiqueta Orientation (1 a 8). Los teléfonos guardan la foto como la capta el sensor y
+     * anotan aquí cómo girarla; 1 = sin cambios, también si no hay EXIF o no se puede leer.
+     */
+    static int orientacionExif(byte[] original) {
+        try {
+            ExifIFD0Directory exif = ImageMetadataReader.readMetadata(new ByteArrayInputStream(original))
+                    .getFirstDirectoryOfType(ExifIFD0Directory.class);
+            if (exif != null && exif.containsTag(ExifIFD0Directory.TAG_ORIENTATION)) {
+                return exif.getInt(ExifIFD0Directory.TAG_ORIENTATION);
+            }
+        } catch (Exception e) {
+            log.debug("Sin orientación EXIF legible: {}", e.getMessage());
+        }
+        return 1;
+    }
+
+    /** Aplica la transformación de la orientación EXIF (giros de 90/180/270 y reflejos). */
+    static BufferedImage orientar(BufferedImage imagen, int orientacion) {
+        if (orientacion < 2 || orientacion > 8) {
+            return imagen;
+        }
+        int w = imagen.getWidth();
+        int h = imagen.getHeight();
+        boolean intercambia = orientacion >= 5; // 5 a 8 giran 90°: ancho y alto se intercambian
+        AffineTransform t = new AffineTransform();
+        switch (orientacion) {
+            case 2 -> { t.translate(w, 0); t.scale(-1, 1); }
+            case 3 -> { t.translate(w, h); t.rotate(Math.PI); }
+            case 4 -> { t.translate(0, h); t.scale(1, -1); }
+            case 5 -> { t.rotate(-Math.PI / 2); t.scale(-1, 1); }
+            case 6 -> { t.translate(h, 0); t.rotate(Math.PI / 2); }
+            case 7 -> { t.scale(-1, 1); t.translate(-h, 0); t.translate(0, w); t.rotate(-Math.PI / 2); }
+            case 8 -> { t.translate(0, w); t.rotate(-Math.PI / 2); }
+            default -> { }
+        }
+        BufferedImage destino = new BufferedImage(intercambia ? h : w, intercambia ? w : h,
+                BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = destino.createGraphics();
+        g.drawImage(imagen, t, null);
+        g.dispose();
+        return destino;
     }
 
     /** Solo JPEG o PNG, reconocidos por su contenido y no por la extensión. */

@@ -106,6 +106,12 @@
 			<artifactId>pdfbox</artifactId>
 			<version>3.0.5</version>
 		</dependency>
+		<!-- Orientación EXIF de las fotos de perfil tomadas con el teléfono -->
+		<dependency>
+			<groupId>com.drewnoakes</groupId>
+			<artifactId>metadata-extractor</artifactId>
+			<version>2.19.0</version>
+		</dependency>
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
