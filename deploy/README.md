@@ -48,6 +48,13 @@ MYSQL_PWD=$(gcloud secrets versions access latest --secret ensayos-db-root-passw
 
 Los cambios de esquema (`db/ddl.sql`) se aplican a mano con `root`. El backend usa `ddl-auto=validate` y no puede crear ni modificar tablas.
 
+Para una migración de `db/migraciones/`, **antes** de desplegar el backend que la necesita:
+
+```bash
+./deploy/migrar.sh db/migraciones/2026-10-21_aviso_y_foto.sql
+./deploy/desplegar.sh
+```
+
 ## Datos iniciales (`db/seed_nube.sql`)
 
 - **Administrador:** `glongoria.3a.is@gmail.com`. Entra por OTP; el código le llega a ese correo.
