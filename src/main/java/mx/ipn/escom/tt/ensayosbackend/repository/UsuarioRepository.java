@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
@@ -24,6 +25,8 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
                          Pageable pageable);
 
     long countByRol(Usuario.Rol rol);
+
+    List<Usuario> findByRolAndEstado(Usuario.Rol rol, Usuario.Estado estado);
 
     long countByRolInAndEstado(Collection<Usuario.Rol> roles, Usuario.Estado estado);
 }

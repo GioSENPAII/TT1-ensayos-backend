@@ -8,6 +8,7 @@ import mx.ipn.escom.tt.ensayosbackend.dto.EstadoCuentaRequest;
 import mx.ipn.escom.tt.ensayosbackend.dto.PaginaResponse;
 import mx.ipn.escom.tt.ensayosbackend.entity.Usuario;
 import mx.ipn.escom.tt.ensayosbackend.service.AdminService;
+import mx.ipn.escom.tt.ensayosbackend.service.UsuarioActualService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +23,7 @@ import java.util.List;
 public class UserController {
 
     private final AdminService adminService;
+    private final UsuarioActualService usuarioActual;
 
     @GetMapping
     public PaginaResponse<CuentaResponse> directorio(@RequestParam(required = false) Usuario.Rol rol,
@@ -50,7 +52,7 @@ public class UserController {
     // Permite al alumno volver a subir el ensayo (excepción a RN-WEB-04)
     @DeleteMapping("/{id}/submissions/{submissionId}")
     public ResponseEntity<Void> eliminarEntrega(@PathVariable Long id, @PathVariable Long submissionId) {
-        adminService.eliminarEntrega(id, submissionId);
+        adminService.eliminarEntrega(usuarioActual.obtener(), id, submissionId);
         return ResponseEntity.noContent().build();
     }
 

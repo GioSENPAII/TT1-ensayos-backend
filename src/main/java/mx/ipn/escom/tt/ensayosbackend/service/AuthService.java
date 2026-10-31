@@ -141,11 +141,22 @@ public class AuthService {
         usuarioRepository.findByCorreo(normalizar(request.getCorreo()))
                 .filter(u -> u.getRol() == Usuario.Rol.ADMINISTRADOR)
                 .filter(u -> u.getEstado() == Usuario.Estado.ACTIVA)
-                .ifPresent(admin -> emailService.enviarOtpAdministrador(admin.getCorreo(),
-                        tokenService.crearCodigo(admin, Token.Tipo.OTP, MINUTOS_OTP)));
+                .ifPresent(admin -> {
+                    emailService.enviarOtpAdministrador(admin.getCorreo(),
+                            tokenService.crearCodigo(admin, Token.Tipo.OTP, MINUTOS_OTP));
+                    avisarDemasAdministradores(admin);
+                });
 
-        // E1: misma respuesta aunque el correo no sea del administrador
-        return new MessageResponse("Si el correo corresponde al administrador, recibirás un código de acceso.");
+        // E1: misma respuesta aunque el correo no sea de un administrador
+        return new MessageResponse("Si el correo corresponde a un administrador, recibirás un código de acceso.");
+    }
+
+    /** Correcciones J2: los demás administradores reciben un aviso de cada solicitud de código (sin el código). */
+    private void avisarDemasAdministradores(Usuario solicitante) {
+        LocalDateTime ahora = LocalDateTime.now();
+        usuarioRepository.findByRolAndEstado(Usuario.Rol.ADMINISTRADOR, Usuario.Estado.ACTIVA).stream()
+                .filter(otro -> !otro.getIdUsuario().equals(solicitante.getIdUsuario()))
+                .forEach(otro -> emailService.avisarAccesoAdministrador(otro.getCorreo(), solicitante.getCorreo(), ahora));
     }
 
     @Transactional(noRollbackFor = ApiException.class)

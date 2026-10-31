@@ -57,7 +57,7 @@ Para una migración de `db/migraciones/`, **antes** de desplegar el backend que 
 
 ## Datos iniciales (`db/seed_nube.sql`)
 
-- **Administrador:** `glongoria.3a.is@gmail.com`. Entra por OTP; el código le llega a ese correo.
+- **Administradores:** `glongoria.3a.is@gmail.com`, `porraszuniga@gmail.com` y `joseeduardomayafabela@gmail.com`. Entran por OTP; el código le llega al correo de quien lo pide. En una BD ya creada se agregan con `./deploy/migrar.sh db/migraciones/2026-10-30_administradores.sql` (no hace falta redesplegar el backend).
 - **Cuentas de prueba** (contraseña `Prueba123`): `alumno.prueba@alumno.ipn.mx` y `profesor.prueba@ipn.mx`.
 - **Grupo `SO3CM1`** con dos tareas abiertas.
 

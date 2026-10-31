@@ -3,7 +3,7 @@
 SET NAMES utf8mb4;
 USE ensayos_db;
 
--- RN-AUTH-05: única cuenta de administrador, sin contraseña (inicia sesión por OTP).
+-- Administrador sin contraseña (en la nube hay tres, ver seed_nube.sql) (inicia sesión por OTP).
 -- Cambiar el correo por uno real antes de probar el OTP.
 INSERT INTO usuarios (correo, password_hash, nombre, apellidos, rol)
 VALUES ('admin.ensayos@ipn.mx', NULL, 'Administrador', 'Sistema', 'ADMINISTRADOR');

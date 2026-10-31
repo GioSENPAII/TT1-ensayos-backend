@@ -3,10 +3,12 @@
 SET NAMES utf8mb4;
 USE ensayos_db;
 
--- RN-AUTH-05: única cuenta de administrador, sin contraseña (inicia sesión por OTP).
--- El OTP de cada inicio de sesión llega a este correo.
-INSERT INTO usuarios (correo, password_hash, nombre, apellidos, rol)
-VALUES ('glongoria.3a.is@gmail.com', NULL, 'Administrador', 'Sistema', 'ADMINISTRADOR');
+-- Tres cuentas de administrador sin contraseña (RN-AUTH-05 con la corrección J1): inician sesión por OTP.
+-- El OTP de cada inicio de sesión llega al correo de quien lo pide.
+INSERT INTO usuarios (correo, password_hash, nombre, apellidos, rol) VALUES
+('glongoria.3a.is@gmail.com',        NULL, 'Administrador', 'Sistema', 'ADMINISTRADOR'),
+('porraszuniga@gmail.com',           NULL, 'Administrador', 'Sistema', 'ADMINISTRADOR'),
+('joseeduardomayafabela@gmail.com',  NULL, 'Administrador', 'Sistema', 'ADMINISTRADOR');
 
 INSERT INTO usuarios (correo, password_hash, nombre, apellidos, rol) VALUES
 ('profesor.prueba@ipn.mx',

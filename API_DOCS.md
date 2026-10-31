@@ -16,7 +16,7 @@
 | Formato | JSON (`Content-Type: application/json`) |
 | Autenticación | `Authorization: Bearer <accessToken>` |
 
-El despliegue en la nube está documentado en `deploy/README.md`. En la nube, el administrador es `glongoria.3a.is@gmail.com`; en local, `admin.ensayos@ipn.mx`.
+El despliegue en la nube está documentado en `deploy/README.md`. En la nube hay tres administradores (`glongoria.3a.is@gmail.com`, `porraszuniga@gmail.com` y `joseeduardomayafabela@gmail.com`); en local, `admin.ensayos@ipn.mx`.
 
 ### Formato de errores (RFC 9457)
 
@@ -148,7 +148,9 @@ Se usan para la verificación de registro (15 min), el OTP del administrador (10
 ```json
 { "correo": "admin.ensayos@ipn.mx" }
 ```
-**200** siempre, con `"Si el correo corresponde al administrador, recibirás un código de acceso."`
+**200** siempre, con `"Si el correo corresponde a un administrador, recibirás un código de acceso."`
+
+El código se envía solo al correo que lo pidió. Los **demás administradores activos** reciben en ese momento un correo de aviso ("Aviso: intento de acceso de administrador") con el correo de quien lo pidió y la hora, sin el código. El aviso se envía en segundo plano y no retrasa la respuesta.
 
 ### POST `/auth/admin/verify-otp`
 ```json
@@ -339,7 +341,7 @@ Todos requieren el token de una sesión de **administrador** (obtenida con `admi
 | GET | `/users/{id}` | La cuenta y su `impacto`, para el diálogo de confirmación antes de eliminar: `{ inscripciones?, grupos?, tareas?, entregas, advertencia }`. `advertencia` trae el texto de CU-WEB-03 4c/4d con los números reales |
 | PATCH | `/users/{id}/status` | `{ "estado": "SUSPENDIDA" }` o `{ "estado": "ACTIVA" }`. Al suspender, **se cierran las sesiones abiertas** de esa cuenta |
 | GET | `/users/{id}/submissions` | **200** `[{ id, nombreArchivo, tamanoBytes, fechaEntrega, tareaId, tarea, grupoId, grupo, estado }]` del alumno, de la más reciente a la más antigua. **Sin calificación** (RN-WEB-03). **400** si la cuenta no es de un alumno |
-| DELETE | `/users/{id}/submissions/{submissionId}` | **204**. Borra la entrega, su calificación y su PDF para que el alumno **pueda volver a subir** el ensayo (única excepción a RN-WEB-04). **409** si la entrega se está calificando (`EN_REVISION`). **404** si la entrega no es de ese alumno. Si la tarea ya cerró, el alumno solo podrá reenviar si el profesor amplía la fecha de cierre |
+| DELETE | `/users/{id}/submissions/{submissionId}` | **204**. Borra la entrega, su calificación y su PDF para que el alumno **pueda volver a subir** el ensayo (única excepción a RN-WEB-04). **409** si la entrega se está calificando (`EN_REVISION`). **404** si la entrega no es de ese alumno. Si la tarea ya cerró, el alumno solo podrá reenviar si el profesor amplía la fecha de cierre. Al eliminarse, el **profesor del grupo recibe un correo** con el administrador que la eliminó, el alumno, el grupo, la tarea, el archivo, el estado y la calificación que tenía |
 | DELETE | `/users/{id}` | **204**. Elimina en cascada y en una sola transacción. Profesor: sus grupos, tareas, entregas y calificaciones; los alumnos conservan sus cuentas. Alumno: sus inscripciones, entregas y calificaciones. Los PDF se borran del disco |
 
 `cuenta` = `{ id, correo, nombre, apellidos, rol, estado, fechaRegistro, tieneFoto }`

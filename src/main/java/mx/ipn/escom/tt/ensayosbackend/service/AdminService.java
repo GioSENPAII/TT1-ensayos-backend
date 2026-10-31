@@ -7,8 +7,10 @@ import mx.ipn.escom.tt.ensayosbackend.dto.EntregaResponse;
 import mx.ipn.escom.tt.ensayosbackend.dto.EstadoCuentaRequest;
 import mx.ipn.escom.tt.ensayosbackend.dto.MetricasResponse;
 import mx.ipn.escom.tt.ensayosbackend.dto.PaginaResponse;
+import mx.ipn.escom.tt.ensayosbackend.entity.Calificacion;
 import mx.ipn.escom.tt.ensayosbackend.entity.Ensayo;
 import mx.ipn.escom.tt.ensayosbackend.entity.Grupo;
+import mx.ipn.escom.tt.ensayosbackend.entity.Tarea;
 import mx.ipn.escom.tt.ensayosbackend.entity.Usuario;
 import mx.ipn.escom.tt.ensayosbackend.exception.ApiException;
 import mx.ipn.escom.tt.ensayosbackend.repository.*;
@@ -16,7 +18,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -37,9 +42,11 @@ public class AdminService {
     private final TareaRepository tareaRepository;
     private final InscripcionRepository inscripcionRepository;
     private final EnsayoRepository ensayoRepository;
+    private final CalificacionRepository calificacionRepository;
     private final TokenService tokenService;
     private final AlmacenamientoService almacenamiento;
     private final EntregaService entregaService;
+    private final EmailService emailService;
 
     /** Directorio de alumnos y profesores, con filtros por rol, estado y texto (correo o nombre). */
     @Transactional(readOnly = true)
@@ -113,10 +120,11 @@ public class AdminService {
     /**
      * Elimina una entrega con su calificación y auditoría (ON DELETE CASCADE) para que el alumno pueda
      * volver a subir el ensayo. Es la única excepción a RN-WEB-04; si la tarea ya cerró, el alumno solo
-     * podrá reenviar si el profesor amplía la fecha límite (RN-WEB-02).
+     * podrá reenviar si el profesor amplía la fecha límite (RN-WEB-02). Al confirmarse, el profesor del grupo
+     * recibe un correo con el detalle de lo eliminado (correcciones J3).
      */
     @Transactional
-    public void eliminarEntrega(Long idAlumno, Long idEnsayo) {
+    public void eliminarEntrega(Usuario administrador, Long idAlumno, Long idEnsayo) {
         Usuario alumno = alumno(idAlumno);
         Ensayo ensayo = ensayoRepository.findById(idEnsayo)
                 .filter(e -> e.getAlumno().getIdUsuario().equals(alumno.getIdUsuario()))
@@ -125,12 +133,40 @@ public class AdminService {
             // El motor la está calificando: borrarla ahora dejaría al proceso en segundo plano sin entrega
             throw ApiException.conflict("La entrega se está calificando. Intenta de nuevo cuando termine.");
         }
+        Calificacion calificacion = calificacionRepository.findByEnsayo(ensayo).orElse(null);
+        EmailService.EntregaEliminada aviso = avisoEntregaEliminada(administrador, alumno, ensayo, calificacion);
         String ruta = ensayo.getRutaArchivo();
+        if (calificacion != null) {
+            // Ya cargada para el aviso: se borra antes que la entrega para que JPA no la deje huérfana
+            calificacionRepository.delete(calificacion);
+        }
         ensayoRepository.delete(ensayo);
         ensayoRepository.flush();
         almacenamiento.eliminarAlConfirmar(List.of(ruta));
         log.info("Entrega {} de {} (tarea {}) eliminada por el administrador",
                 idEnsayo, alumno.getCorreo(), ensayo.getTarea().getIdTarea());
+        // Solo si el borrado se confirma: un aviso de algo que no se eliminó confundiría al profesor
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                emailService.avisarEntregaEliminada(aviso);
+            }
+        });
+    }
+
+    /** Copia los datos del aviso antes de borrar: después la entrega y su calificación ya no existen. */
+    private EmailService.EntregaEliminada avisoEntregaEliminada(Usuario administrador, Usuario alumno, Ensayo ensayo,
+                                                                Calificacion calificacion) {
+        Tarea tarea = ensayo.getTarea();
+        Grupo grupo = tarea.getGrupo();
+        Usuario profesor = grupo.getProfesor();
+        return new EmailService.EntregaEliminada(
+                profesor.getCorreo(), profesor.getNombre(), administrador.getCorreo(), LocalDateTime.now(),
+                alumno.getNombre() + " " + alumno.getApellidos(), alumno.getCorreo(),
+                grupo.getNombre(), grupo.getCodigoAcceso(), tarea.getNombre(), tarea.getFechaCierre(),
+                ensayo.getNombreArchivo(), ensayo.getFechaEntrega(), ensayo.getEstado(),
+                calificacion == null ? null : calificacion.getCalificacionFinal(),
+                calificacion != null && calificacion.isModificadoPorDocente());
     }
 
     private Usuario alumno(Long id) {
@@ -160,7 +196,7 @@ public class AdminService {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound("La cuenta no existe"));
         if (usuario.getRol() == Usuario.Rol.ADMINISTRADOR) {
-            throw ApiException.forbidden("No es posible " + accion + " la cuenta del administrador desde esta interfaz");
+            throw ApiException.forbidden("No es posible " + accion + " la cuenta de un administrador desde esta interfaz");
         }
         return usuario;
     }
