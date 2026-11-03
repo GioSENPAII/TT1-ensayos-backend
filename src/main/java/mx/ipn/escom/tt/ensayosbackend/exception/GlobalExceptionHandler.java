@@ -13,6 +13,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -62,6 +63,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleMethod(HttpRequestMethodNotSupportedException e,
                                                       HttpServletRequest request) {
         return build(HttpStatus.METHOD_NOT_ALLOWED, "Método no permitido para este recurso", request, null);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ProblemDetail> handleMediaType(HttpMediaTypeNotSupportedException e,
+                                                         HttpServletRequest request) {
+        return build(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "El tipo de contenido de la petición no es válido", request, null);
     }
 
     // Respaldo ante carreras: la restricción UNIQUE de la BD detectó un duplicado
